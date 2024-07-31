@@ -1,0 +1,37 @@
+Changes in module 'nf-core/seqkit/grep'
+--- modules/nf-core/seqkit/grep/main.nf
++++ modules/nf-core/seqkit/grep/main.nf
+@@ -9,11 +9,10 @@
+         'biocontainers/seqkit:2.8.1--h9ee0642_0' }"
+ 
+     input:
+-    tuple val(meta), path(sequence)
+-    path pattern
++    tuple val(meta), path(sequence), val(meta2), path(pattern)
+ 
+     output:
+-    tuple val(meta), path("*.{fa,fq}.gz")  , emit: filter
++    tuple val(meta2), path("*.{fa,fq}")  , emit: filter
+     path "versions.yml"                    , emit: versions
+ 
+     when:
+@@ -21,7 +20,7 @@
+ 
+     script:
+     def args = task.ext.args ?: ''
+-    def prefix = task.ext.prefix ?: "${meta.id}"
++    def prefix = task.ext.prefix ?: "${meta2.id}"
+     // fasta or fastq. Exact pattern match .fasta or .fa suffix with optional .gz (gzip) suffix
+     def suffix = task.ext.suffix ?: "${sequence}" ==~ /(.*f[astn]*a(.gz)?$)/ ? "fa" : "fq"
+     def pattern_file = pattern ? "-f ${pattern}" : ""
+@@ -33,7 +32,7 @@
+         --threads $task.cpus \\
+         ${pattern_file} \\
+         ${sequence} \\
+-        -o ${prefix}.${suffix}.gz \\
++        -o ${prefix}.best_reference.${suffix} \\
+ 
+     cat <<-END_VERSIONS > versions.yml
+     "${task.process}":
+
+************************************************************

@@ -1,0 +1,14 @@
+Changes in module 'nf-core/bwa/index'
+--- modules/nf-core/bwa/index/main.nf
++++ modules/nf-core/bwa/index/main.nf
+@@ -11,7 +11,7 @@
+     tuple val(meta), path(fasta)
+ 
+     output:
+-    tuple val(meta), path(bwa) , emit: index
++    tuple val(meta), path(fasta), path(bwa) , emit: fasta_and_index
+     path "versions.yml"        , emit: versions
+ 
+     when:
+
+************************************************************

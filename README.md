@@ -10,62 +10,90 @@
 
 ## Introduction
 
-**charlesfoster/h2seq** is a bioinformatics pipeline that ...
+**charlesfoster/h2seq** is a bioinformatics pipeline that has been designed to analyse molecular sequencing data of viruses for the H2Seq study. Accordingly, it has been designed with HCV and HIV in mind, but in theory should work with any (most?) viruses. The workflow will handle data from both long-read (ONT) and/or short-read (Illumina) (to be added) sequencing platforms, and can handle tiled amplicon sequencing and/or shotgun/metagenomic/capture probe sequencing. 
 
-<!-- TODO nf-core:
-   Complete this sentence with a 2-3 sentence summary of what types of data the pipeline ingests, a brief overview of the
-   major pipeline sections and the types of output it produces. You're giving an overview to someone new
-   to nf-core here, in 15-20 seconds. For an example, see https://github.com/nf-core/rnaseq/blob/master/README.md#introduction
--->
+### Quality Control
+1. Read QC ([`FastQC`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/))
+2. Read filtering/trimming
+   * Long reads: ([`NanoQ`](https://github.com/esteinig/nanoq))
+   * Short reads: ([`fastp`](https://github.com/OpenGene/fastp))
+3. Present QC for raw reads ([`MultiQC`](http://multiqc.info/))
+
+### Amplicon Sequencing
+1. Selection of closest reference genome
+   * Choice of ([`kallisto`](https://github.com/pachterlab/kallisto)) or ([`salmon`](https://github.com/COMBINE-lab/salmon))
+2. Alignment of reads against closest reference genome using([`minimap2`](https://github.com/lh3/minimap2))
+3. Masking of amplicon primer sequences
+   * Determination of primer coordinates using ([`bwa`](https://github.com/lh3/bwa)) and ([`bedtools`](https://github.com/arq5x/bedtools2))
+   * Soft clipping of primer regions with ([`samtools ampliconclip`](http://www.htslib.org/doc/samtools-ampliconclip.html))
+4. Consensus genome generation with ([`samtools consensus`](http://www.htslib.org/doc/samtools-consensus.html))
+
+### Metagenomic Sequencing
+*TBC*
+
+### Specialised Modules
+**HCV-GLUE**
+
+Given the initial focus of this pipeline for the H2Seq study, a module has been included to run the excellent ([`HCV-GLUE`](https://github.com/giffordlabcvr/HCV-GLUE)) tool. While the tool can do *a lot*, in this case the use is for generating reports based on HCV consensus genomes. The usage of `HCV-GLUE`, by design, needs SQL-like syntax and relies on a Docker daemon running in the background. While it makes sense for 'vanilla' usage of `HCV-GLUE`, unfortunately it does not make its incorporation into a pipeline strictly following the `nf-core` framework straightforward. Therefore, unlike all other modules in the pipeline, in which tools are automatically sourced from containers/conda, successful use of `HCV-GLUE` requires manual installation of it and its dependencies. Please see the ([installation instructions](http://hcv-glue.cvr.gla.ac.uk/#/aboutGlueProject)) for `HCV-GLUE` if you wish to run this module.
+
+
+### Future considerations:
+- *variant calling to produce a VCF file instead of/in addition to direct consensus generation*
+- *estimation of the amino acid consequences of SNPs/indels to aid with drug resistance analysis*
+- *placement of input samples into a phylogenetic tree*
+- *host filtration*
+- *use `pycoQC` for Nanopore QC instead of fastQC*
 
 <!-- TODO nf-core: Include a figure that guides the user through the major workflow steps. Many nf-core
      workflows use the "tube map" design for that. See https://nf-co.re/docs/contributing/design_guidelines#examples for examples.   -->
-<!-- TODO nf-core: Fill in short bullet-pointed list of the default steps in the pipeline -->
 
-1. Read QC ([`FastQC`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/))
-2. Present QC for raw reads ([`MultiQC`](http://multiqc.info/))
 
 ## Usage
 
 > [!NOTE]
 > If you are new to Nextflow and nf-core, please refer to [this page](https://nf-co.re/docs/usage/installation) on how to set-up Nextflow. Make sure to [test your setup](https://nf-co.re/docs/usage/introduction#how-to-run-a-pipeline) with `-profile test` before running the workflow on actual data.
 
-<!-- TODO nf-core: Describe the minimum required steps to execute the pipeline, e.g. how to prepare samplesheets.
-     Explain what rows and columns represent. For instance (please edit as appropriate):
-
-First, prepare a samplesheet with your input data that looks as follows:
+First, prepare a samplesheet with your input data that (minimally) looks as follows:
 
 `samplesheet.csv`:
 
 ```csv
-sample,fastq_1,fastq_2
-CONTROL_REP1,AEG588A1_S1_L002_R1_001.fastq.gz,AEG588A1_S1_L002_R2_001.fastq.gz
+sample,long_reads,short_reads_1,short_reads_2
+sample2,sample1.long.fastq.gz,sample1_S1_L002_R1_001.fastq.gz,sample1_S1_L002_R2_001.fastq.gz
 ```
 
-Each row represents a fastq file (single-end) or a pair of fastq files (paired end).
+Each row points the workflow to fastq files associated with a sample. Each sample can have one long reads file, and one short read fastq file (single-end) or a pair of short read fastq files (paired end).
 
--->
+Extra columns can be added to the spreadsheet as required for local purposes (e.g., tracking barcodes/serial numbers etc.), but must occur *after* the mandatory minimal columns and cannot use any of the mandatory minimal column names.
 
-Now, you can run the pipeline using:
-
-<!-- TODO nf-core: update the following command to include all required parameters for a minimal example -->
+Now, you can minimally run the pipeline using:
 
 ```bash
 nextflow run charlesfoster/h2seq \
-   -profile <docker/singularity/.../institute> \
+   -profile <docker/singularity/...> \
    --input samplesheet.csv \
    --outdir <OUTDIR>
+```
+
+Available parameters to be configured can be viewed by running:
+
+```bash
+nextflow run charlesfoster/h2seq --help
 ```
 
 > [!WARNING]
 > Please provide pipeline parameters via the CLI or Nextflow `-params-file` option. Custom config files including those provided by the `-c` Nextflow option can be used to provide any configuration _**except for parameters**_;
 > see [docs](https://nf-co.re/usage/configuration#custom-configuration-files).
 
+
+For more details and further functionality, please refer to the [usage documentation](https://nf-co.re/mag/usage). 
+
 ## Credits
 
 charlesfoster/h2seq was originally written by Charles Foster.
 
 We thank the following people for their extensive assistance in the development of this pipeline:
+* No one else yet!
 
 <!-- TODO nf-core: If applicable, make list of people who have also contributed -->
 

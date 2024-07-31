@@ -1,0 +1,79 @@
+Changes in module 'nf-core/kallisto/quant'
+--- modules/nf-core/kallisto/quant/main.nf
++++ modules/nf-core/kallisto/quant/main.nf
+@@ -8,17 +8,12 @@
+         'biocontainers/kallisto:0.48.0--h15996b6_2' }"
+ 
+     input:
+-    tuple val(meta), path(reads)
+-    tuple val(meta2), path(index)
+-    path gtf
+-    path chromosomes
+-    val fragment_length
+-    val fragment_length_sd
++    tuple val(meta), path(reads), val(fragment_length), val(fragment_length_sd), val(meta2), path(index)
+ 
+     output:
+-    tuple val(meta), path("${prefix}")        , emit: results
++    tuple val(meta), path("${prefix}.abundance.tsv")        , emit: tsv
+     tuple val(meta), path("*.run_info.json")  , emit: json_info
+-    tuple val(meta), path("*.log")            , emit: log
++    tuple val(meta), path("*.kallisto_quant.log")            , emit: log
+     path "versions.yml"                       , emit: versions
+ 
+     when:
+@@ -27,8 +22,6 @@
+     script:
+     def args = task.ext.args ?: ''
+     prefix = task.ext.prefix ?: "${meta.id}"
+-    def gtf_input = gtf ? "--gtf ${gtf}" : ''
+-    def chromosomes_input = chromosomes ? "--chromosomes ${chromosomes}" : ''
+ 
+     def single_end_params = ''
+     if (meta.single_end) {
+@@ -38,29 +31,20 @@
+         if (!(fragment_length_sd =~ /^\d+$/)) {
+             error "fragment_length_sd must be set and numeric for single-end data"
+         }
+-        single_end_params = "--single --fragment-length=${fragment_length} --sd=${fragment_length_sd}"
+-    }
+-
+-    def strandedness = ''
+-    if (!args.contains('--fr-stranded') && !args.contains('--rf-stranded')) {
+-        strandedness =  (meta.strandedness == 'forward') ? '--fr-stranded' :
+-                        (meta.strandedness == 'reverse') ? '--rf-stranded' : ''
++        single_end_params = "--single --single-overhang --fragment-length=${fragment_length} --sd=${fragment_length_sd}"
+     }
+ 
+     """
+     mkdir -p $prefix && kallisto quant \\
+             --threads ${task.cpus} \\
+             --index ${index} \\
+-            ${gtf_input} \\
+-            ${chromosomes_input} \\
+             ${single_end_params} \\
+-            ${strandedness} \\
+             ${args} \\
+             -o $prefix \\
+-            ${reads} 2> >(tee -a ${prefix}/kallisto_quant.log >&2)
++            ${reads} 2> >(tee -a ${prefix}.kallisto_quant.log >&2)
+ 
+-    cp ${prefix}/kallisto_quant.log ${prefix}.log
+-    cp ${prefix}/run_info.json ${prefix}.run_info.json
++    mv ${prefix}/run_info.json ${prefix}.run_info.json
++    mv ${prefix}/abundance.tsv ${prefix}.abundance.tsv
+ 
+     cat <<-END_VERSIONS > versions.yml
+     "${task.process}":
+@@ -73,7 +57,8 @@
+ 
+     """
+     mkdir -p $prefix
+-    touch ${prefix}.log
++    touch ${prefix}.abundance.tsv
++    touch ${prefix}.kallisto_quant.log
+     touch ${prefix}.run_info.json
+ 
+     cat <<-END_VERSIONS > versions.yml
+
+************************************************************

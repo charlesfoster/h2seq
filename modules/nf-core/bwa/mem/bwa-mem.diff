@@ -1,0 +1,44 @@
+Changes in module 'nf-core/bwa/mem'
+--- modules/nf-core/bwa/mem/main.nf
++++ modules/nf-core/bwa/mem/main.nf
+@@ -8,16 +8,14 @@
+         'biocontainers/mulled-v2-fe8faa35dbf6dc65a0f7f5d4ea12e31a79f73e40:1bd8542a8a0b42e0981337910954371d0230828e-0' }"
+ 
+     input:
+-    tuple val(meta) , path(reads)
+-    tuple val(meta2), path(index)
+-    tuple val(meta3), path(fasta)
++    tuple val(meta) , path(reads), val(meta2), path(fasta), path(index)
+     val   sort_bam
+ 
+     output:
+-    tuple val(meta), path("*.bam")  , emit: bam,    optional: true
+-    tuple val(meta), path("*.cram") , emit: cram,   optional: true
+-    tuple val(meta), path("*.csi")  , emit: csi,    optional: true
+-    tuple val(meta), path("*.crai") , emit: crai,   optional: true
++    tuple val(meta2), path("*.bam")  , emit: bam,    optional: true
++    tuple val(meta2), path("*.cram") , emit: cram,   optional: true
++    tuple val(meta2), path("*.csi")  , emit: csi,    optional: true
++    tuple val(meta2), path("*.crai") , emit: crai,   optional: true
+     path  "versions.yml"            , emit: versions
+ 
+     when:
+
+--- modules/nf-core/bwa/mem/environment.yml
++++ modules/nf-core/bwa/mem/environment.yml
+@@ -1,10 +1,11 @@
+ name: bwa_mem
++
+ channels:
+   - conda-forge
+   - bioconda
+   - defaults
++
+ dependencies:
+   - bwa=0.7.18
+-  # renovate: datasource=conda depName=bioconda/samtools
++  - htslib=1.20.0
+   - samtools=1.20
+-  - htslib=1.20.0
+
+************************************************************

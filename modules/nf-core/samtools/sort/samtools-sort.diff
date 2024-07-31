@@ -1,0 +1,30 @@
+Changes in module 'nf-core/samtools/sort'
+--- modules/nf-core/samtools/sort/main.nf
++++ modules/nf-core/samtools/sort/main.nf
+@@ -8,8 +8,7 @@
+         'biocontainers/samtools:1.20--h50ea8bc_0' }"
+ 
+     input:
+-    tuple val(meta) , path(bam)
+-    tuple val(meta2), path(fasta)
++    tuple val(meta) , path(bam), path(fasta)
+ 
+     output:
+     tuple val(meta), path("*.bam"),     emit: bam,  optional: true
+
+--- modules/nf-core/samtools/sort/environment.yml
++++ modules/nf-core/samtools/sort/environment.yml
+@@ -1,8 +1,10 @@
+ name: samtools_sort
++
+ channels:
+   - conda-forge
+   - bioconda
+   - defaults
++
+ dependencies:
++  - bioconda::htslib=1.20
+   - bioconda::samtools=1.20
+-  - bioconda::htslib=1.20
+
+************************************************************

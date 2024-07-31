@@ -72,36 +72,55 @@ workflow PIPELINE_INITIALISATION {
     UTILS_NFCORE_PIPELINE (
         nextflow_cli_args
     )
+    
     //
-    // Custom validation for pipeline parameters
+    // Custom validation for pipeline parameters - default, not using
     //
     validateInputParameters()
 
-    //
-    // Create channel from input file provided through params.input
-    //
-    Channel
+    // Validate FASTQ input - taken from MAG
+    ch_samplesheet = Channel
         .fromSamplesheet("input")
         .map {
-            meta, fastq_1, fastq_2 ->
-                if (!fastq_2) {
-                    return [ meta.id, meta + [ single_end:true ], [ fastq_1 ] ]
-                } else {
-                    return [ meta.id, meta + [ single_end:false ], [ fastq_1, fastq_2 ] ]
+            validateInputSamplesheet(it[0], it[1], it[2], it[3])
+        }
+
+    //
+    // Create fastq channels by separating long and short reads
+    //
+    ch_raw_long_reads = ch_samplesheet
+        .map { meta, lr, sr1, sr2 ->
+                if (lr) {
+                    meta.single_end = true
+                    return [ meta, lr ]
                 }
         }
-        .groupTuple()
-        .map {
-            validateInputSamplesheet(it)
+
+    ch_raw_short_reads = ch_samplesheet
+        .map { meta, lr, sr1, sr2 ->
+                meta.single_end = params.single_end
+                if (params.single_end) {
+                    return [ meta, [ sr1 ] ]
+                } else {
+                    return [ meta, [ sr1, sr2 ] ]
+                }
         }
-        .map {
-            meta, fastqs ->
-                return [ meta, fastqs.flatten() ]
+    
+    ch_raw_long_reads = ch_raw_long_reads
+        .map { meta, lr ->
+            def meta_new = meta + [long_reads: true]
+            return [ meta_new, lr ]
         }
-        .set { ch_samplesheet }
+
+    ch_raw_short_reads = ch_raw_short_reads
+        .map { meta, reads ->
+            def meta_new = meta + [long_reads: false]
+            return [ meta_new, reads ]
+        }
 
     emit:
-    samplesheet = ch_samplesheet
+    raw_long_reads   = ch_raw_long_reads
+    raw_short_reads  = ch_raw_short_reads
     versions    = ch_versions
 }
 
@@ -154,24 +173,79 @@ workflow PIPELINE_COMPLETION {
 //
 // Check and validate pipeline parameters
 //
+// TODO nf-core: add in other checks here based on all params
 def validateInputParameters() {
     genomeExistsError()
-}
 
-//
-// Validate channels from input samplesheet
-//
-def validateInputSamplesheet(input) {
-    def (metas, fastqs) = input[1..2]
-
-    // Check that multiple runs of the same sample are of the same datatype i.e. single-end / paired-end
-    def endedness_ok = metas.collect{ it.single_end }.unique().size == 1
-    if (!endedness_ok) {
-        error("Please check input samplesheet -> Multiple runs of a sample must be of the same datatype i.e. single-end or paired-end: ${metas[0].id}")
+    // Check if proper files provided for reference selection and alignment
+    if (!params.skip_reference_selection && !params.possible_references) {
+        error("[charlesfoster/h2seq] ERROR: Invalid combination of parameter '--skip_reference_selection' and parameter '--possible_references'. If '--skip_reference_selection' is not specified, a (multi)fasta file must be specified with '--possible_references'.")
+    }
+    if (params.skip_reference_selection && !params.reference_fasta) {
+        error("[charlesfoster/h2seq] ERROR: Invalid combination of parameter '--skip_reference_selection' and parameter '--reference_fasta'. If '--skip_reference_selection' is specified, a fasta file must be specified with '--reference_fasta'.")
     }
 
-    return [ metas[0], fastqs ]
+    // Check if proper files provided for primer clipping
+    if (!params.skip_primer_trimming && !params.primer_fasta && !params.primer_bed) {
+        error("[charlesfoster/h2seq] ERROR: Invalid combination of parameters '--skip_primer_trimming', '--primer_fasta' and '--primer_bed'. The '--primer_fasta' parameter is *mandatory* if `--skip_primer_trimming` is not specified and `--primer_bed' is not specified. The '--primer_bed' parameter is *mandatory* if `--skip_primer_trimming` is not specified and `--primer_fasta' is not specified.")
+    }
+
+    if (params.filter_host_reads) {
+        log.warn("[charlesfoster/h2seq] WARNING: host filtration not yet implemented so nothing will happen. Watch this space...")
+        // Check if parameters for host contamination removal are valid
+        if ( params.host_fasta && params.host_genome) {
+            error('[charlesfoster/h2seq] ERROR: Both host fasta reference and iGenomes genome are specified to remove host contamination! Invalid combination, please specify either --host_fasta or --host_genome.')
+        }
+
+        // below taken from nf-core/MAG
+        if ( params.host_genome ) {
+            if (!params.genomes) {
+                error('[charlesfoster/h2seq] ERROR: No config file containing genomes provided!')
+            }
+            // Check if host genome exists in the config file
+            if (!params.genomes.containsKey(params.host_genome)) {
+                error('=============================================================================\n' +
+                        "  Host genome '${params.host_genome}' not found in any config files provided to the pipeline.\n" +
+                        '  Currently, the available genome keys are:\n' +
+                        "  ${params.genomes.keySet().join(', ')}\n" +
+                        '===================================================================================')
+            }
+            if ( !params.genomes[params.host_genome].fasta ) {
+                error("[charlesfoster/h2seq] ERROR: No fasta file specified for the host genome ${params.host_genome}!")
+            }
+            if ( !params.genomes[params.host_genome].bowtie2 ) {
+                error("[charlesfoster/h2seq] ERROR: No Bowtie 2 index file specified for the host genome ${params.host_genome}!")
+            }
+        }
+    }
 }
+
+//
+// Validate channels from input samplesheet - taken from MAG
+//
+def validateInputSamplesheet(meta, lr, sr1, sr2 ) {
+
+        if ( !sr2 && !params.single_end ) { error("[charlesfoster/h2seq] ERROR: Single-end data must be executed with `--single_end`. Note that it is not possible to mix single- and paired-end data (for short reads) in one run! Check input TSV for sample: ${meta.id}") }
+        if ( sr2 && params.single_end ) { error("[charlesfoster/h2seq] ERROR: Paired-end data must be executed without `--single_end`. Note that it is not possible to mix single- and paired-end data (for short reads) in one run! Check input TSV for sample: ${meta.id}") }
+
+    return [meta, lr, sr1, sr2]
+}
+
+//
+// Validate channels from input samplesheet - default, not using
+//
+// def validateInputSamplesheet(input) {
+//     def (metas, fastqs) = input[1..2]
+
+//     // Check that multiple runs of the same sample are of the same datatype i.e. single-end / paired-end
+//     def endedness_ok = metas.collect{ it.single_end }.unique().size == 1
+//     if (!endedness_ok) {
+//         error("Please check input samplesheet -> Multiple runs of a sample must be of the same datatype i.e. single-end or paired-end: ${metas[0].id}")
+//     }
+
+//     return [ metas[0], fastqs ]
+// }
+
 //
 // Get attribute from genome config file e.g. fasta
 //

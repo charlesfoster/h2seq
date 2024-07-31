@@ -1,0 +1,47 @@
+Changes in module 'nf-core/samtools/ampliconclip'
+--- modules/nf-core/samtools/ampliconclip/main.nf
++++ modules/nf-core/samtools/ampliconclip/main.nf
+@@ -1,6 +1,6 @@
+ process SAMTOOLS_AMPLICONCLIP {
+     tag "$meta.id"
+-    label 'process_medium'
++    label 'process_low'
+ 
+     conda "${moduleDir}/environment.yml"
+     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+@@ -8,8 +8,7 @@
+         'biocontainers/samtools:1.20--h50ea8bc_0' }"
+ 
+     input:
+-    tuple val(meta), path(bam)
+-    path bed
++    tuple val(meta), path(bam), path(bed)
+     val save_cliprejects
+     val save_clipstats
+ 
+@@ -27,7 +26,7 @@
+     def prefix = task.ext.prefix ?: "${meta.id}"
+     def rejects = save_cliprejects ? "--rejects-file ${prefix}.cliprejects.bam" : ""
+     def stats   = save_clipstats   ? "-f ${prefix}.clipstats.txt"               : ""
+-    if ("$bam" == "${prefix}.bam") error "Input and output names are the same, use \"task.ext.prefix\" to disambiguate!"
++    if ("$bam" == "${prefix}.clipallowed.bam") error "Input and output names are the same, use \"task.ext.prefix\" to disambiguate!"
+     """
+     samtools \\
+         ampliconclip \\
+
+--- modules/nf-core/samtools/ampliconclip/environment.yml
++++ modules/nf-core/samtools/ampliconclip/environment.yml
+@@ -1,8 +1,10 @@
+ name: samtools_ampliconclip
++
+ channels:
+   - conda-forge
+   - bioconda
+   - defaults
++
+ dependencies:
++  - bioconda::htslib=1.20
+   - bioconda::samtools=1.20
+-  - bioconda::htslib=1.20
+
+************************************************************

@@ -1,0 +1,41 @@
+Changes in module 'nf-core/salmon/quant'
+--- modules/nf-core/salmon/quant/main.nf
++++ modules/nf-core/salmon/quant/main.nf
+@@ -8,15 +8,14 @@
+         'biocontainers/salmon:1.10.1--h7e5ed60_0' }"
+ 
+     input:
+-    tuple val(meta), path(reads)
++    tuple val(meta), path(reads), path(transcript_fasta)
+     path  index
+-    path  gtf
+-    path  transcript_fasta
+     val   alignment_mode
+     val   lib_type
+ 
+     output:
+     tuple val(meta), path("${prefix}")              , emit: results
++    tuple val(meta), path("*.salmon_abundance.tsv") , emit: tsv
+     tuple val(meta), path("*info.json")             , emit: json_info, optional: true
+     tuple val(meta), path("*lib_format_counts.json"), emit: lib_format_counts, optional: true
+     path  "versions.yml"                            , emit: versions
+@@ -60,7 +59,6 @@
+     }
+     """
+     salmon quant \\
+-        --geneMap $gtf \\
+         --threads $task.cpus \\
+         --libType=$strandedness \\
+         $reference \\
+@@ -73,6 +71,9 @@
+     fi
+     if [ -f $prefix/lib_format_counts.json ]; then
+         cp $prefix/lib_format_counts.json "${prefix}_lib_format_counts.json"
++    fi
++    if [ -f $prefix/quant.sf ]; then
++        cp $prefix/quant.sf  "${prefix}.salmon_abundance.tsv"
+     fi
+ 
+     cat <<-END_VERSIONS > versions.yml
+
+************************************************************

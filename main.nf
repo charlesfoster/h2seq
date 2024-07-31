@@ -30,7 +30,7 @@ include { getGenomeAttribute      } from './subworkflows/local/utils_nfcore_h2se
 // TODO nf-core: Remove this line if you don't need a FASTA file
 //   This is an example of how to use getGenomeAttribute() to fetch parameters
 //   from igenomes.config using `--genome`
-params.fasta = getGenomeAttribute('fasta')
+// params.fasta = getGenomeAttribute('fasta')
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -44,7 +44,8 @@ params.fasta = getGenomeAttribute('fasta')
 workflow CHARLESFOSTER_H2SEQ {
 
     take:
-    samplesheet // channel: samplesheet read in from --input
+        raw_long_reads
+        raw_short_reads
 
     main:
 
@@ -52,7 +53,8 @@ workflow CHARLESFOSTER_H2SEQ {
     // WORKFLOW: Run pipeline
     //
     H2SEQ (
-        samplesheet
+        raw_long_reads,
+        raw_short_reads
     )
 
     emit:
@@ -86,7 +88,8 @@ workflow {
     // WORKFLOW: Run main workflow
     //
     CHARLESFOSTER_H2SEQ (
-        PIPELINE_INITIALISATION.out.samplesheet
+        PIPELINE_INITIALISATION.out.raw_long_reads,
+        PIPELINE_INITIALISATION.out.raw_short_reads
     )
 
     //
