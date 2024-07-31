@@ -225,7 +225,7 @@ def validateInputParameters() {
 //
 def validateInputSamplesheet(meta, lr, sr1, sr2 ) {
 
-        if ( !sr2 && !params.single_end ) { error("[charlesfoster/h2seq] ERROR: Single-end data must be executed with `--single_end`. Note that it is not possible to mix single- and paired-end data (for short reads) in one run! Check input TSV for sample: ${meta.id}") }
+        if ( sr1 && !sr2 && !params.single_end ) { error("[charlesfoster/h2seq] ERROR: Single-end data must be executed with `--single_end`. Note that it is not possible to mix single- and paired-end data (for short reads) in one run! Check input TSV for sample: ${meta.id}") }
         if ( sr2 && params.single_end ) { error("[charlesfoster/h2seq] ERROR: Paired-end data must be executed without `--single_end`. Note that it is not possible to mix single- and paired-end data (for short reads) in one run! Check input TSV for sample: ${meta.id}") }
 
     return [meta, lr, sr1, sr2]

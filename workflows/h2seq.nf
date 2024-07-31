@@ -32,6 +32,7 @@ include { BEDTOOLS_BAMTOBED                       } from '../modules/nf-core/bed
 include { SAMTOOLS_CONSENSUS        } from '../modules/local/samtools/consensus/main'
 include { CALCULATE_READ_STATS      } from '../modules/local/custom/calculate_read_stats/main'
 include { SELECT_BEST_REFERENCE     } from '../modules/local/custom/select_best_reference/main'
+include { REMOVE_EMPTY_SEQUENCES    } from '../modules/local/custom/remove_empty_sequences/main'
 include { HCV_GLUE                  } from '../modules/local/custom/hcv_glue/main'
 
 /*
@@ -329,8 +330,14 @@ workflow H2SEQ {
     */
 
     if ( params.run_hcv_glue ){
-        HCV_GLUE (
+        REMOVE_EMPTY_SEQUENCES (
             ch_consensus_fa
+        )
+
+        ch_glue_fa = REMOVE_EMPTY_SEQUENCES.out.fasta
+
+        HCV_GLUE (
+            ch_glue_fa
         )
     }
 

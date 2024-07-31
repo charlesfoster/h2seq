@@ -1,4 +1,4 @@
-process CALCULATE_READ_STATS {
+process REMOVE_EMPTY_SEQUENCES {
     tag "$meta.id"
     label 'process_single'
 
@@ -8,10 +8,11 @@ process CALCULATE_READ_STATS {
         'biocontainers/biopython:1.70--np112py36_0'}"
 
     input:
-    tuple val(meta), path(reads)
+    tuple val(meta), path(fasta)
 
     output:
-    tuple val(meta), path(reads), (env mean_length), (env std_dev) , emit: reads_and_stats
+    tuple val(meta), path("*.reporting.fasta") , emit: fasta, optional: true
+    tuple val(meta), path("*.empty.fasta") , emit: empty_fasta, optional: true
     path "versions.yml"                                                               , emit: versions
 
     when:
@@ -21,9 +22,10 @@ process CALCULATE_READ_STATS {
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    calculate_read_stats.py $reads
-    mean_length=\$(head -n 1 mean_length.txt)
-    std_dev=\$(head -n 1 std_dev.txt)
+    filter_fasta.py $fasta ${prefix}
+
+    [ -s ${prefix}.reporting.fasta ] || rm ${prefix}.reporting.fasta
+    [ -s ${prefix}.empty.fasta ] || rm ${prefix}.empty.fasta
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -35,10 +37,8 @@ process CALCULATE_READ_STATS {
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}_filtered"
     """
-    touch mean_length.txt
-    touch std_dev.txt
-    mean_length=123
-    std_dev=456
+    touch sample.reporting.fasta
+    touch sample.reporting.fasta
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

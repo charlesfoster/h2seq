@@ -116,7 +116,6 @@
                 "extra_salmon_args": {
                     "type": "string",
                     "description": "Extra arguments to be passed to \"salmon quant\"",
-                    "default": null,
                     "hidden": true,
                     "help_text": "Must be provided as a string within quotes."
                 },
@@ -201,6 +200,11 @@
                     "fa_icon": "fas fa-file-code",
                     "hidden": false,
                     "help_text": "Minimum depth for a base to be called in the consensus genome. Values less than `--consensus_min_depth` are filled with N"
+                },
+                "ont_r10_sup": {
+                    "type": "boolean",
+                    "description": "Data are derived from the ONT platform with R10.4 chemistry and were basecalled with the \"super accurate\" basecalling model.",
+                    "help_text": "Used only when calling a consensus genome using the Bayesian algorithm of `samtools consensus`"
                 }
             }
         },
@@ -428,7 +432,7 @@
                     "type": "string",
                     "fa_icon": "far fa-check-circle",
                     "description": "Base URL or local path to location of pipeline test dataset files",
-                    "default": "https://raw.githubusercontent.com/charlesfoster/h2seq/test-datasets/",
+                    "default": "https://github.com/charlesfoster/h2seq/tree/dev/test-datasets",
                     "hidden": true
                 }
             }
