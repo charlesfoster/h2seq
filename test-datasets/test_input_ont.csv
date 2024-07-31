@@ -1,2 +1,2 @@
 sample,long_reads,short_reads_1,short_reads_2
-test_input_ont,https://github.com/charlesfoster/h2seq/raw/dev/test-datasets/test_input_ont.fastq.gz,,
+test_input_ont,test-datasets/test_input_ont.fastq.gz,,

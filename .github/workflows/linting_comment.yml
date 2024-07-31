@@ -13,6 +13,7 @@ jobs:
       - name: Download lint results
         uses: dawidd6/action-download-artifact@09f2f74827fd3a8607589e5ad7f9398816f540fe # v3
         with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           workflow: linting.yml
           workflow_conclusion: completed
 
