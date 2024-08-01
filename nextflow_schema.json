@@ -96,7 +96,7 @@
                     "help_text": "Skip the automatic selection of the best reference genome for each input sample from the multifasta file specified by `--possible_references`.",
                     "fa_icon": "fas fa-question-circle"
                 },
-                "preset_virus": {
+                "virus_preset": {
                     "type": "string",
                     "description": "Select one of the preset virus options to use in-built FASTA of possible reference sequences.",
                     "enum": ["hcv"],
@@ -109,7 +109,7 @@
                     "hidden": false,
                     "mimetype": "text/plain",
                     "pattern": "^\\S+\\.fn?a(sta)?(\\.gz)?$",
-                    "description": "Path to FASTA file.",
+                    "description": "Path to (multi)fasta file with possible reference(s). This parameter is *mandatory* if `--skip_reference_selection` is not specified and `--virus_preset` is not specified.",
                     "help_text": "Path to (multi)fasta file with possible reference(s). This parameter is *mandatory* if `--skip_reference_selection` is not specified.",
                     "fa_icon": "far fa-file-code"
                 },

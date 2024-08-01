@@ -180,13 +180,11 @@ def validateInputParameters() {
     // check for presets
     // Check if proper files provided for reference selection and alignment
 
-    if ( !params.skip_reference_selection && params.preset_virus ) {
-        if ( params.preset_virus == "hcv" ) {
-            params.possible_references = "${projectDir}/assets/reference_data/hcv_references.fasta"
-        } else {
-            error("[charlesfoster/h2seq] ERROR: Invalid option for parameter '--preset_virus'.")
+    if ( !params.skip_reference_selection && params.virus_preset ) {
+        if ( params.virus_preset != "hcv" ) {
+            error("[charlesfoster/h2seq] ERROR: Invalid option for parameter '--virus_preset'.")
         }
-    } else if (!params.skip_reference_selection && !params.preset_virus && !params.possible_references) {
+    } else if (!params.skip_reference_selection && !params.virus_preset && !params.possible_references) {
         error("[charlesfoster/h2seq] ERROR: Invalid combination of parameter '--skip_reference_selection' and parameter '--possible_references'. If '--skip_reference_selection' is not specified, a (multi)fasta file must be specified with '--possible_references'.")
     }
     

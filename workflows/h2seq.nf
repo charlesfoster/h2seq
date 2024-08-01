@@ -42,8 +42,14 @@ include { HCV_GLUE                  } from '../modules/local/custom/hcv_glue/mai
 */
 
 if (!params.skip_reference_selection){
-    if (params.possible_references) {
-        ch_reference_fasta = Channel.fromPath(params.possible_references)
+    if ( params.virus_preset == "hcv" ) {
+        possible_references =  "${projectDir}/assets/reference_data/hcv_references.fasta"
+    } else {
+        possible_references = params.possible_references
+    }
+
+    if (possible_references) {
+        ch_reference_fasta = Channel.fromPath(possible_references)
         ch_reference_fasta = ch_reference_fasta
             .map { fasta ->
                 def meta = [id: 'possible_references']
