@@ -14,8 +14,9 @@ process HCV_GLUE {
     script:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
+    def randomName = UUID.randomUUID().toString().take(8)
     """
     FASTA_DIR=\$(dirname \$(readlink -f ${fasta}))
-    docker run --rm --name ${prefix} -v \$PWD:\$PWD -v \$FASTA_DIR:\$FASTA_DIR -w \$PWD --link gluetools-mysql cvrbioinformatics/gluetools:latest gluetools.sh -i project hcv  module phdrReportingController invoke-function reportFastaAsHtml ${fasta} ${prefix}.html
+    docker run --rm --name ${prefix}_${randomName} -v \$PWD:\$PWD -v \$FASTA_DIR:\$FASTA_DIR -w \$PWD --link gluetools-mysql cvrbioinformatics/gluetools:latest gluetools.sh -i project hcv  module phdrReportingController invoke-function reportFastaAsHtml ${fasta} ${prefix}.html
     """
 }

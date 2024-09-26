@@ -6,26 +6,31 @@
 
 // nf-core modules //
 
-include { FASTQC as FASTQC_RAW                    } from '../modules/nf-core/fastqc/main'
-include { FASTQC as FASTQC_TRIMMED                } from '../modules/nf-core/fastqc/main'
+include { FASTQC as FASTQC_RAW_SHORT              } from '../modules/nf-core/fastqc/main'
+include { FASTQC as FASTQC_TRIMMED_SHORT          } from '../modules/nf-core/fastqc/main'
+include { FASTQC as FASTQC_RAW_LONG               } from '../modules/nf-core/fastqc/main'
+include { FASTQC as FASTQC_TRIMMED_LONG           } from '../modules/nf-core/fastqc/main'
+include { FASTP                                   } from '../modules/nf-core/fastp/main'
 include { MULTIQC                                 } from '../modules/nf-core/multiqc/main'
 include { paramsSummaryMap                        } from 'plugin/nf-validation'
 include { paramsSummaryMultiqc                    } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { softwareVersionsToYAML                  } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { methodsDescriptionText                  } from '../subworkflows/local/utils_nfcore_h2seq_pipeline'
-include { NANOQ                                   } from '../modules/nf-core/nanoq/main'                         
-include { KALLISTO_INDEX                          } from '../modules/nf-core/kallisto/index/main'       
-include { KALLISTO_QUANT                          } from '../modules/nf-core/kallisto/quant/main'       
+include { NANOQ                                   } from '../modules/nf-core/nanoq/main'
+include { KALLISTO_INDEX                          } from '../modules/nf-core/kallisto/index/main'
+include { KALLISTO_QUANT                          } from '../modules/nf-core/kallisto/quant/main'
 include { SALMON_INDEX                            } from '../modules/nf-core/salmon/index/main'
-include { SALMON_QUANT                            } from '../modules/nf-core/salmon/quant/main'
-include { MINIMAP2_ALIGN                          } from '../modules/nf-core/minimap2/align/main'       
-include { MINIMAP2_ALIGN as MINIMAP2_ALIGN_SALMON } from '../modules/nf-core/minimap2/align/main'       
+include { SALMON_QUANT as SALMON_QUANT_LONG       } from '../modules/nf-core/salmon/quant/main'
+include { SALMON_QUANT as SALMON_QUANT_SHORT      } from '../modules/nf-core/salmon/quant/main'
+include { MINIMAP2_ALIGN                          } from '../modules/nf-core/minimap2/align/main'
+include { MINIMAP2_ALIGN as MINIMAP2_ALIGN_SALMON } from '../modules/nf-core/minimap2/align/main'
 include { SAMTOOLS_AMPLICONCLIP                   } from '../modules/nf-core/samtools/ampliconclip/main'
 include { SAMTOOLS_SORT                           } from '../modules/nf-core/samtools/sort/main'
-include { MOSDEPTH                                } from '../modules/nf-core/mosdepth/main'                   
-include { BWA_INDEX                               } from '../modules/nf-core/bwa/index/main'                 
-include { BWA_MEM                                 } from '../modules/nf-core/bwa/mem/main'                     
-include { SEQKIT_GREP                             } from '../modules/nf-core/seqkit/grep/main'             
+include { MOSDEPTH                                } from '../modules/nf-core/mosdepth/main'
+include { BWA_INDEX                               } from '../modules/nf-core/bwa/index/main'
+include { BWA_MEM as MAP_PRIMERS                  } from '../modules/nf-core/bwa/mem/main'
+include { BWA_MEM                                 } from '../modules/nf-core/bwa/mem/main'
+include { SEQKIT_GREP                             } from '../modules/nf-core/seqkit/grep/main'
 include { BEDTOOLS_BAMTOBED                       } from '../modules/nf-core/bedtools/bamtobed/main'
 
 // local modules //
@@ -71,6 +76,7 @@ if (params.primer_fasta) {
     ch_primer_fasta = Channel.empty()
 }
 
+ch_fastp_adapter_path = params.fastp_adapter_path ? file(params.fastp_adapter_path) : []
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -95,59 +101,92 @@ workflow H2SEQ {
     ================================================================================
     */
 
-    FASTQC_RAW (
+    FASTQC_RAW_LONG (
         ch_raw_long_reads
     )
-    ch_multiqc_files = ch_multiqc_files.mix(FASTQC_RAW.out.zip.collect{it[1]})
-    ch_versions = ch_versions.mix(FASTQC_RAW.out.versions.first())
+    ch_multiqc_files = ch_multiqc_files.mix(FASTQC_RAW_LONG.out.zip.collect{it[1]})
+    ch_versions = ch_versions.mix(FASTQC_RAW_LONG.out.versions.first())
 
     // TODO nf-core: add nanoq out to multiqc
     NANOQ (
         ch_raw_long_reads,
         "fastq"
     )
-    ch_clean_reads = NANOQ.out.reads
+    ch_clean_reads_long = NANOQ.out.reads
     ch_versions = ch_versions.mix(NANOQ.out.versions)
 
-    FASTQC_TRIMMED (
-        ch_clean_reads
+    FASTQC_TRIMMED_LONG (
+        ch_clean_reads_long
     )
-    ch_multiqc_files = ch_multiqc_files.mix(FASTQC_TRIMMED.out.zip.collect{it[1]})
-    ch_versions = ch_versions.mix(FASTQC_TRIMMED.out.versions.first())
+    ch_multiqc_files = ch_multiqc_files.mix(FASTQC_TRIMMED_LONG.out.zip.collect{it[1]})
+    ch_versions = ch_versions.mix(FASTQC_TRIMMED_LONG.out.versions.first())
+
+    /*
+    ================================================================================
+                                    Preprocessing and QC for short reads
+    ================================================================================
+    */
+
+    FASTQC_RAW_SHORT (
+        ch_raw_short_reads
+    )
+    ch_multiqc_files = ch_multiqc_files.mix(FASTQC_RAW_SHORT.out.zip.collect{it[1]})
+    ch_versions = ch_versions.mix(FASTQC_RAW_SHORT.out.versions.first())
+
+    FASTP (
+        ch_raw_short_reads,
+        ch_fastp_adapter_path,
+        false,
+        false
+    )
+
+    ch_clean_reads_short = FASTP.out.reads
+    ch_versions = ch_versions.mix(FASTP.out.versions.first())
+
+    FASTQC_TRIMMED_SHORT (
+        ch_clean_reads_short
+    )
+    ch_multiqc_files = ch_multiqc_files.mix(FASTQC_TRIMMED_SHORT.out.zip.collect{it[1]})
+    ch_versions = ch_versions.mix(FASTQC_TRIMMED_SHORT.out.versions.first())
+
 
     /*
     ================================================================================
                                     Reference selection section
     ================================================================================
     */
+
+    ch_clean_reads_combined = ch_clean_reads_short.mix(ch_clean_reads_long)
+
     if (!params.skip_reference_selection){
         if (params.reference_selection_tool == "kallisto") {
-            CALCULATE_READ_STATS( 
-                ch_clean_reads
+            CALCULATE_READ_STATS(
+                ch_clean_reads_combined
             )
             ch_reads_and_stats = CALCULATE_READ_STATS.out.reads_and_stats
             ch_versions = ch_versions.mix(CALCULATE_READ_STATS.out.versions)
 
-            KALLISTO_INDEX ( 
-                ch_reference_fasta 
+            KALLISTO_INDEX (
+                ch_reference_fasta
             )
             ch_reference_fasta_index = KALLISTO_INDEX.out.index
             ch_versions = ch_versions.mix(KALLISTO_INDEX.out.versions)
-            
+
             ch_quant_input = ch_reads_and_stats
                 .combine(ch_reference_fasta_index)
 
-            KALLISTO_QUANT ( 
+            KALLISTO_QUANT (
                 ch_quant_input
             )
             ch_abundance_tsv = KALLISTO_QUANT.out.tsv
             ch_versions = ch_versions.mix(KALLISTO_QUANT.out.versions)
         } else if (params.reference_selection_tool == "salmon") {
-            ch_map_for_salmon = ch_clean_reads
+            // Focus on (potential) long reads first
+            ch_map_for_salmon_long = ch_clean_reads_long
                 .combine(ch_reference_fasta)
 
             MINIMAP2_ALIGN_SALMON (
-                ch_map_for_salmon,
+                ch_map_for_salmon_long,
                 true, // output in bam format
                 false, //sort output
                 "bai",
@@ -159,18 +198,45 @@ workflow H2SEQ {
                 .map { meta, fasta ->
                     [fasta]
                 }
-            ch_alignment_for_salmon = MINIMAP2_ALIGN_SALMON.out.bam
+
+            ch_input_for_salmon_long = MINIMAP2_ALIGN_SALMON.out.bam
                 .combine(ch_ref_for_salmon)
 
-            SALMON_QUANT (
-                ch_alignment_for_salmon,
+            SALMON_QUANT_LONG (
+                ch_input_for_salmon_long,
                 [],
                 true,
                 "A"
             )
-            ch_versions = ch_versions.mix(SALMON_QUANT.out.versions)
-            ch_abundance_tsv = SALMON_QUANT.out.tsv
+            ch_versions = ch_versions.mix(SALMON_QUANT_LONG.out.versions)
+            ch_abundance_tsv_long = SALMON_QUANT_LONG.out.tsv
+
+            // Focus on (potential) short reads second
+
+            SALMON_INDEX (
+                ch_ref_for_salmon
+            )
+
+            ch_versions = ch_versions.mix(SALMON_INDEX.out.versions)
+            ch_salmon_idx = SALMON_INDEX.out.index.first()
+
+            ch_input_for_salmon_short = ch_clean_reads_short
+                .combine(ch_ref_for_salmon)
+
+            SALMON_QUANT_SHORT (
+                ch_input_for_salmon_short,
+                ch_salmon_idx,
+                false,
+                "A"
+            )
+            ch_versions = ch_versions.mix(SALMON_QUANT_SHORT.out.versions)
+            ch_abundance_tsv_short = SALMON_QUANT_SHORT.out.tsv
+
+            // combine the results
+            ch_abundance_tsv = ch_abundance_tsv_long
+                .mix(ch_abundance_tsv_short)
         }
+
         SELECT_BEST_REFERENCE (
             ch_abundance_tsv
         )
@@ -180,14 +246,21 @@ workflow H2SEQ {
 
         ch_seqkit_input = ch_reference_fasta
             .combine(ch_best_ref_txt)
-        
+
         SEQKIT_GREP (
             ch_seqkit_input
         )
 
         ch_versions = ch_versions.mix(SEQKIT_GREP.out.versions)
-    
-        ch_reads_for_minimap = ch_clean_reads
+
+        // Set up the reads channel(s) for alignment
+        // Need ensure the short and long reads are aligned with the correct tools
+        ch_clean_short_reads_for_alignment = ch_clean_reads_short
+            .map{ meta, reads ->
+                [meta.id, meta, reads]
+            }
+
+        ch_clean_long_reads_for_alignment = ch_clean_reads_long
             .map{ meta, reads ->
                 [meta.id, meta, reads]
             }
@@ -196,10 +269,10 @@ workflow H2SEQ {
             .map{ meta, fasta ->
                 [meta.id, meta, fasta]
             }
-        
+
         ch_fasta_for_samtools_sort = ch_best_ref_fasta
-       
-        ch_minimap2_input = ch_reads_for_minimap
+
+        ch_alignment_input_long = ch_clean_long_reads_for_alignment
             .combine(ch_best_ref_fasta, by:0)
             .map{ id, meta1, reads, meta2, fasta ->
                 [meta1, reads, meta2, fasta]
@@ -210,12 +283,27 @@ workflow H2SEQ {
                 def meta = [id: 'best_reference']
                 return [meta.id, meta, fasta]
             }
+
         ch_fasta_for_samtools_sort = ch_best_ref_fasta
-        .map { meta, fasta ->
-            [meta.id,meta,fasta]
-        }
-        ch_minimap2_input = ch_clean_reads
-            .combine(ch_best_ref_fasta)
+            .map { meta, fasta ->
+                [meta.id,meta,fasta]
+            }
+
+        ch_clean_short_reads_for_alignment = ch_clean_reads_short
+            .map{ meta, reads ->
+                [meta.id, meta, reads]
+            }
+
+        ch_clean_long_reads_for_alignment = ch_clean_reads_long
+            .map{ meta, reads ->
+                [meta.id, meta, reads]
+            }
+
+        ch_alignment_input_long = ch_clean_long_reads_for_alignment
+            .combine(ch_best_ref_fasta, by:0)
+            .map{ id, meta1, reads, meta2, fasta ->
+                [meta1, reads, meta2, fasta]
+            }
     }
 
     /*
@@ -225,7 +313,7 @@ workflow H2SEQ {
     */
 
     MINIMAP2_ALIGN (
-        ch_minimap2_input,
+        ch_alignment_input_long,
         true,
         true,
         "bai",
@@ -236,9 +324,42 @@ workflow H2SEQ {
     ch_minimap2_bam_idx = MINIMAP2_ALIGN.out.index
     ch_versions = ch_versions.mix(MINIMAP2_ALIGN.out.versions)
 
+    ch_bwa_index_input = ch_best_ref_fasta
+        .map{ id, meta, fasta ->
+            [meta, fasta]
+        }
+
+    BWA_INDEX (
+        ch_bwa_index_input
+    )
+    ch_versions = ch_versions.mix(BWA_INDEX.out.versions)
+
+    ch_index_for_combining = BWA_INDEX.out.fasta_and_index
+        .map{ meta, fasta, index ->
+            [meta.id, meta, fasta, index]
+        }
+
+    ch_alignment_input_short = ch_clean_short_reads_for_alignment
+        .combine(ch_index_for_combining, by:0)
+        .map{ id, meta1, reads, meta2, fasta, index ->
+            [meta1, reads, meta2, fasta, index]
+        }
+
+    BWA_MEM (
+        ch_alignment_input_short,
+        true
+    )
+
+    ch_bwa_bam = BWA_MEM.out.bam
+    ch_bwa_bam_idx = BWA_MEM.out.csi
+    ch_versions = ch_versions.mix(BWA_MEM.out.versions)
+
+    ch_combined_bam = ch_minimap2_bam
+        .mix(ch_bwa_bam)
+
     if (!params.skip_primer_trimming){
         if (!params.primer_bed){
-            
+
             ch_bwa_input_fasta = ch_best_ref_fasta
                 .map{id,meta,fasta ->
                     [meta, fasta]
@@ -248,16 +369,16 @@ workflow H2SEQ {
                 ch_bwa_input_fasta
             )
             ch_versions = ch_versions.mix(BWA_INDEX.out.versions)
-            
+
             ch_bwa_mem_input = ch_primer_fasta
                 .combine(BWA_INDEX.out.fasta_and_index)
 
-            BWA_MEM (
+            MAP_PRIMERS (
                 ch_bwa_mem_input,
                 false
             )
-            ch_primer_bam = BWA_MEM.out.bam
-            ch_versions = ch_versions.mix(BWA_MEM.out.versions)
+            ch_primer_bam = MAP_PRIMERS.out.bam
+            ch_versions = ch_versions.mix(MAP_PRIMERS.out.versions)
 
             BEDTOOLS_BAMTOBED (
                 ch_primer_bam
@@ -267,7 +388,7 @@ workflow H2SEQ {
                     [ meta.id, meta, bed ]
                 }
 
-            ch_samtools_ampliconclip_input = ch_minimap2_bam
+            ch_samtools_ampliconclip_input = ch_combined_bam
                 .map { meta, bam ->
                     [meta.id, meta, bam]
                 }
@@ -283,10 +404,10 @@ workflow H2SEQ {
                 return [meta, bed]
             }
 
-            ch_samtools_ampliconclip_input = ch_minimap2_bam
+            ch_samtools_ampliconclip_input = ch_combined_bam
                 .combine(ch_primer_bed)
         }
-        
+
         SAMTOOLS_AMPLICONCLIP (
             ch_samtools_ampliconclip_input,
             true,
@@ -295,7 +416,7 @@ workflow H2SEQ {
 
         ch_clipped_bam = SAMTOOLS_AMPLICONCLIP.out.bam
         ch_versions = ch_versions.mix(SAMTOOLS_AMPLICONCLIP.out.versions)
-        
+
         ch_samtools_sort_input = ch_clipped_bam
             .map {meta, bam ->
                 [meta.id, meta, bam]
@@ -311,10 +432,10 @@ workflow H2SEQ {
 
         ch_consensus_bam = SAMTOOLS_SORT.out.bam
         ch_versions = ch_versions.mix(SAMTOOLS_SORT.out.versions)
-       
+
     } else {
         ch_primer_bed = Channel.empty()
-        ch_consensus_bam = ch_minimap2_bam
+        ch_consensus_bam = ch_combined_bam
     }
 
     /*
@@ -325,7 +446,7 @@ workflow H2SEQ {
 
     SAMTOOLS_CONSENSUS (
         ch_consensus_bam
-    ) 
+    )
 
     ch_consensus_fa = SAMTOOLS_CONSENSUS.out.fasta
 

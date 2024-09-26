@@ -72,7 +72,7 @@ workflow PIPELINE_INITIALISATION {
     UTILS_NFCORE_PIPELINE (
         nextflow_cli_args
     )
-    
+
     //
     // Custom validation for pipeline parameters - default, not using
     //
@@ -90,22 +90,26 @@ workflow PIPELINE_INITIALISATION {
     //
     ch_raw_long_reads = ch_samplesheet
         .map { meta, lr, sr1, sr2 ->
-                if (lr) {
-                    meta.single_end = true
-                    return [ meta, lr ]
-                }
+            if (lr) {
+                meta.single_end = true
+                return [ meta, lr ]
+            }
         }
 
     ch_raw_short_reads = ch_samplesheet
         .map { meta, lr, sr1, sr2 ->
-                meta.single_end = params.single_end
-                if (params.single_end) {
-                    return [ meta, [ sr1 ] ]
-                } else {
-                    return [ meta, [ sr1, sr2 ] ]
-                }
+            if (sr1 && sr2) {
+                meta.single_end = false
+                return [ meta, [ sr1, sr2 ] ]
+            } else if (sr1) {
+                meta.single_end = true
+                return [ meta, [ sr1 ] ]
+            } else {
+                return null // This ensures the channel remains empty if both sr1 and sr2 are missing
+            }
         }
-    
+        .filter { it != null } // Remove any null values from the channel
+
     ch_raw_long_reads = ch_raw_long_reads
         .map { meta, lr ->
             def meta_new = meta + [long_reads: true]
@@ -187,7 +191,7 @@ def validateInputParameters() {
     } else if (!params.skip_reference_selection && !params.virus_preset && !params.possible_references) {
         error("[charlesfoster/h2seq] ERROR: Invalid combination of parameter '--skip_reference_selection' and parameter '--possible_references'. If '--skip_reference_selection' is not specified, a (multi)fasta file must be specified with '--possible_references'.")
     }
-    
+
     if (params.skip_reference_selection && !params.reference_fasta) {
         error("[charlesfoster/h2seq] ERROR: Invalid combination of parameter '--skip_reference_selection' and parameter '--reference_fasta'. If '--skip_reference_selection' is specified, a fasta file must be specified with '--reference_fasta'.")
     }

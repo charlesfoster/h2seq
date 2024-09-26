@@ -65,7 +65,7 @@
                     "help_text": "Save quality-controlled sequencing reads.",
                     "fa_icon": "fas fa-align-center"
                 },
-                "read_min_len": {
+                "long_reads_min_len": {
                     "type": "integer",
                     "description": "Minimum read length to retain during QC filtering.",
                     "default": 500,
@@ -73,7 +73,7 @@
                     "hidden": false,
                     "help_text": "Minimum read length to retain during QC filtering."
                 },
-                "read_max_len": {
+                "long_reads_max_len": {
                     "type": "integer",
                     "description": "Maximum read length to retain during QC filtering.",
                     "default": 2000,
@@ -82,6 +82,75 @@
                     "help_text": "Maximum read length to retain during QC filtering."
                 }
             }
+        },
+        "short_read_quality_control_options": {
+            "title": "Short read quality control options",
+            "type": "object",
+            "description": "",
+            "default": "",
+            "properties": {
+                "save_trimmed_short_reads": {
+                    "type": "boolean",
+                    "fa_icon": "fas fa-stream"
+                },
+                "short_reads_min_len": {
+                    "type": "integer",
+                    "default": 70,
+                    "fa_icon": "fas fa-ruler"
+                },
+                "fastp_qualified_quality": {
+                    "type": "integer",
+                    "default": 15,
+                    "hidden": true,
+                    "fa_icon": "fas fa-notes-medical"
+                },
+                "fastp_unqualified_percent_limit": {
+                    "type": "integer",
+                    "default": 40,
+                    "hidden": true,
+                    "fa_icon": "fas fa-percent"
+                },
+                "fastp_cut_mean_quality": {
+                    "type": "integer",
+                    "default": 15,
+                    "hidden": true,
+                    "fa_icon": "fas fa-notes-medical"
+                },
+                "fastp_interleaved_in": {
+                    "type": "boolean",
+                    "hidden": true,
+                    "fa_icon": "fas fa-question-circle"
+                },
+                "fastp_save_merged": {
+                    "type": "boolean",
+                    "hidden": true,
+                    "fa_icon": "fas fa-question-circle"
+                },
+                "fastp_low_complexity_filter": {
+                    "type": "boolean",
+                    "default": true,
+                    "hidden": true,
+                    "fa_icon": "fas fa-filter"
+                },
+                "fastp_complexity_threshold": {
+                    "type": "integer",
+                    "default": 40,
+                    "hidden": true,
+                    "fa_icon": "fas fa-shield-virus"
+                },
+                "fastp_error_correction": {
+                    "type": "boolean",
+                    "default": true,
+                    "hidden": true,
+                    "fa_icon": "fas fa-question-circle"
+                },
+                "fastp_adapter_path": {
+                    "type": "string",
+                    "hidden": true,
+                    "fa_icon": "fas fa-folder-open"
+                }
+            },
+            "fa_icon": "fas fa-dna"
         },
         "amplicon_workflow_options": {
             "title": "Amplicon workflow options",
@@ -464,6 +533,9 @@
         },
         {
             "$ref": "#/definitions/long_read_quality_control_options"
+        },
+        {
+            "$ref": "#/definitions/short_read_quality_control_options"
         },
         {
             "$ref": "#/definitions/amplicon_workflow_options"

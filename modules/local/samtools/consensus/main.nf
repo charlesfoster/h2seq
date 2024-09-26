@@ -12,6 +12,7 @@ process SAMTOOLS_CONSENSUS {
 
     output:
     tuple val(meta), path("*.consensus.fa")  , emit: fasta
+    tuple val(meta), path("*.consensus.bam"), path("*.csi")  , emit: bam
     tuple val(meta), path("*.simple_consensus.fa")  , emit: simple_fasta
     path "versions.yml"                         , emit: versions
 
@@ -23,6 +24,9 @@ process SAMTOOLS_CONSENSUS {
     def args2 = task.ext.args2 ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
+    ln -s $bam ./${prefix}.consensus.bam
+    samtools index --csi ./${prefix}.consensus.bam
+
     samtools \\
         consensus \\
         --threads ${task.cpus-1} \\
