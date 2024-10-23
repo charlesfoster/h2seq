@@ -1,5 +1,5 @@
 {
-    "$schema": "http://json-schema.org/draft-07/schema",
+    "$schema": "https://json-schema.org/draft-07/schema",
     "$id": "https://raw.githubusercontent.com/charlesfoster/h2seq/master/nextflow_schema.json",
     "title": "charlesfoster/h2seq pipeline parameters",
     "description": "This pipeline analyses HCV and HIV sequencing data from the H2Seq study",
