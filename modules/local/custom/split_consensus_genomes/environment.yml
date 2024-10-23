@@ -1,0 +1,7 @@
+name: calculate_read_stats
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - bioconda::biopython=1.70

@@ -6,3 +6,5 @@ results/
 testing/
 testing*
 *.pyc
+delete_before_commit/
+

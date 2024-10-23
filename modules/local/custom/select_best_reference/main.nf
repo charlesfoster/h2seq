@@ -13,6 +13,7 @@ process SELECT_BEST_REFERENCE {
     output:
     tuple val(meta), path("*.best_reference.tsv"), emit: best_ref_tsv
     tuple val(meta), path("*.best_reference.txt"), emit: best_ref_txt
+    tuple val(meta), path("*.alternate_subtypes.txt"), emit: alt_ref_txt, optional: true
     path "versions.yml"                                                               , emit: versions
 
     when:
@@ -27,6 +28,7 @@ process SELECT_BEST_REFERENCE {
         --sample_name $prefix \\
         --output ${prefix}.best_reference.tsv \\
         --best_ref_txt ${prefix}.best_reference.txt \\
+        --alternate_subtype_txt ${prefix}.alternate_subtypes.txt \\
         $args 
 
     cat <<-END_VERSIONS > versions.yml

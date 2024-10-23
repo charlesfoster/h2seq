@@ -13,7 +13,7 @@ process REMOVE_EMPTY_SEQUENCES {
     output:
     tuple val(meta), path("*.reporting.fasta") , emit: fasta, optional: true
     tuple val(meta), path("*.empty.fasta") , emit: empty_fasta, optional: true
-    path "versions.yml"                                                               , emit: versions
+    path "versions.yml"                , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
@@ -22,11 +22,13 @@ process REMOVE_EMPTY_SEQUENCES {
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    filter_fasta.py $fasta ${prefix}
+    filter_fasta.py ${prefix} $fasta 
 
-    [ -s ${prefix}.reporting.fasta ] || rm ${prefix}.reporting.fasta
-    [ -s ${prefix}.empty.fasta ] || rm ${prefix}.empty.fasta
-
+    [ -s 3a_patchy.*main.reporting.fasta ] || find . -name '3a_patchy.*main.reporting.fasta' -exec rm {} +
+    [ -s 3a_patchy.*main.empty.fasta ] || find . -name '3a_patchy.*main.empty.fasta' -exec rm {} +
+    [ -s 3a_patchy.*alt*.reporting.fasta ] || find . -name '3a_patchy.*alt*.reporting.fasta' -exec rm {} +
+    [ -s 3a_patchy.*alt*.empty.fasta ] || find . -name '3a_patchy.*alt*.empty.fasta' -exec rm {} +
+    
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         biopython: 1.70

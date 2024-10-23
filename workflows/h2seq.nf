@@ -39,6 +39,11 @@ include { CALCULATE_READ_STATS      } from '../modules/local/custom/calculate_re
 include { SELECT_BEST_REFERENCE     } from '../modules/local/custom/select_best_reference/main'
 include { REMOVE_EMPTY_SEQUENCES    } from '../modules/local/custom/remove_empty_sequences/main'
 include { HCV_GLUE                  } from '../modules/local/custom/hcv_glue/main'
+include { SPLIT_CONSENSUS_GENOMES   } from '../modules/local/custom/split_consensus_genomes/main'
+
+// local subworkflows //
+include { LONG_READ_MAPPING        } from '../subworkflows/local/long_read_mapping'
+include { SHORT_READ_MAPPING       } from '../subworkflows/local/short_read_mapping'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -107,7 +112,7 @@ workflow H2SEQ {
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC_RAW_LONG.out.zip.collect{it[1]})
     ch_versions = ch_versions.mix(FASTQC_RAW_LONG.out.versions.first())
 
-    // TODO nf-core: add nanoq out to multiqc
+    // TODO: add nanoq out to multiqc
     NANOQ (
         ch_raw_long_reads,
         "fastq"
@@ -240,70 +245,39 @@ workflow H2SEQ {
         SELECT_BEST_REFERENCE (
             ch_abundance_tsv
         )
+
         ch_best_ref_tsv = SELECT_BEST_REFERENCE.out.best_ref_tsv
         ch_best_ref_txt = SELECT_BEST_REFERENCE.out.best_ref_txt
+        ch_alt_ref_txt = SELECT_BEST_REFERENCE.out.alt_ref_txt
         ch_versions = ch_versions.mix(SELECT_BEST_REFERENCE.out.versions)
 
-        ch_seqkit_input = ch_reference_fasta
-            .combine(ch_best_ref_txt)
+        ch_alt_seqkit_input = ch_reference_fasta
+            .combine(ch_alt_ref_txt)
 
         SEQKIT_GREP (
-            ch_seqkit_input
+            ch_alt_seqkit_input
         )
 
         ch_versions = ch_versions.mix(SEQKIT_GREP.out.versions)
-
-        // Set up the reads channel(s) for alignment
-        // Need ensure the short and long reads are aligned with the correct tools
-        ch_clean_short_reads_for_alignment = ch_clean_reads_short
-            .map{ meta, reads ->
-                [meta.id, meta, reads]
-            }
-
-        ch_clean_long_reads_for_alignment = ch_clean_reads_long
-            .map{ meta, reads ->
-                [meta.id, meta, reads]
-            }
 
         ch_best_ref_fasta = SEQKIT_GREP.out.filter
             .map{ meta, fasta ->
                 [meta.id, meta, fasta]
             }
 
-        ch_fasta_for_samtools_sort = ch_best_ref_fasta
+        ch_best_ref_long = ch_best_ref_fasta
+            .filter { id, meta, fasta -> meta.long_reads == true }
 
-        ch_alignment_input_long = ch_clean_long_reads_for_alignment
-            .combine(ch_best_ref_fasta, by:0)
-            .map{ id, meta1, reads, meta2, fasta ->
-                [meta1, reads, meta2, fasta]
-            }
+        ch_best_ref_short = ch_best_ref_fasta
+            .filter { id, meta, fasta -> meta.long_reads == false }
     } else {
         ch_best_ref_fasta = Channel.fromPath(params.reference_fasta)
             .map { fasta ->
-                def meta = [id: 'best_reference']
+                def meta = [id: 'best_reference', ref_type: 'BEST']
                 return [meta.id, meta, fasta]
             }
-
-        ch_fasta_for_samtools_sort = ch_best_ref_fasta
-            .map { meta, fasta ->
-                [meta.id,meta,fasta]
-            }
-
-        ch_clean_short_reads_for_alignment = ch_clean_reads_short
-            .map{ meta, reads ->
-                [meta.id, meta, reads]
-            }
-
-        ch_clean_long_reads_for_alignment = ch_clean_reads_long
-            .map{ meta, reads ->
-                [meta.id, meta, reads]
-            }
-
-        ch_alignment_input_long = ch_clean_long_reads_for_alignment
-            .combine(ch_best_ref_fasta, by:0)
-            .map{ id, meta1, reads, meta2, fasta ->
-                [meta1, reads, meta2, fasta]
-            }
+        ch_best_ref_long = ch_best_ref_fasta
+        ch_best_ref_short = ch_best_ref_fasta
     }
 
     /*
@@ -311,132 +285,21 @@ workflow H2SEQ {
                                     Mapping and primer clipping
     ================================================================================
     */
+    ch_consensus_bam_long = Channel.empty()
+    ch_consensus_bam_short = Channel.empty()
 
-    MINIMAP2_ALIGN (
-        ch_alignment_input_long,
-        true,
-        true,
-        "bai",
-        false,
-        false
-    )
-    ch_minimap2_bam = MINIMAP2_ALIGN.out.bam
-    ch_minimap2_bam_idx = MINIMAP2_ALIGN.out.index
-    ch_versions = ch_versions.mix(MINIMAP2_ALIGN.out.versions)
+    // Note: here we have separate subworkflows for short and long reads
+    //       Might have been able to avoid this with careful multi-key combines (see Consensus section below),
+    //       but for sustained development this seemed like a better choice.
+    LONG_READ_MAPPING  ( ch_best_ref_long, ch_clean_reads_long, ch_primer_fasta )
+    SHORT_READ_MAPPING ( ch_best_ref_short, ch_clean_reads_short, ch_primer_fasta )
 
-    ch_bwa_index_input = ch_best_ref_fasta
-        .map{ id, meta, fasta ->
-            [meta, fasta]
-        }
+    ch_versions = ch_versions.mix(LONG_READ_MAPPING.out.versions)
+    ch_versions = ch_versions.mix(SHORT_READ_MAPPING.out.versions)
 
-    BWA_INDEX (
-        ch_bwa_index_input
-    )
-    ch_versions = ch_versions.mix(BWA_INDEX.out.versions)
-
-    ch_index_for_combining = BWA_INDEX.out.fasta_and_index
-        .map{ meta, fasta, index ->
-            [meta.id, meta, fasta, index]
-        }
-
-    ch_alignment_input_short = ch_clean_short_reads_for_alignment
-        .combine(ch_index_for_combining, by:0)
-        .map{ id, meta1, reads, meta2, fasta, index ->
-            [meta1, reads, meta2, fasta, index]
-        }
-
-    BWA_MEM (
-        ch_alignment_input_short,
-        true
-    )
-
-    ch_bwa_bam = BWA_MEM.out.bam
-    ch_bwa_bam_idx = BWA_MEM.out.csi
-    ch_versions = ch_versions.mix(BWA_MEM.out.versions)
-
-    ch_combined_bam = ch_minimap2_bam
-        .mix(ch_bwa_bam)
-
-    if (!params.skip_primer_trimming){
-        if (!params.primer_bed){
-
-            ch_bwa_input_fasta = ch_best_ref_fasta
-                .map{id,meta,fasta ->
-                    [meta, fasta]
-                }
-
-            BWA_INDEX (
-                ch_bwa_input_fasta
-            )
-            ch_versions = ch_versions.mix(BWA_INDEX.out.versions)
-
-            ch_bwa_mem_input = ch_primer_fasta
-                .combine(BWA_INDEX.out.fasta_and_index)
-
-            MAP_PRIMERS (
-                ch_bwa_mem_input,
-                false
-            )
-            ch_primer_bam = MAP_PRIMERS.out.bam
-            ch_versions = ch_versions.mix(MAP_PRIMERS.out.versions)
-
-            BEDTOOLS_BAMTOBED (
-                ch_primer_bam
-            )
-            ch_primer_bed = BEDTOOLS_BAMTOBED.out.bed
-                .map { meta, bed ->
-                    [ meta.id, meta, bed ]
-                }
-
-            ch_samtools_ampliconclip_input = ch_combined_bam
-                .map { meta, bam ->
-                    [meta.id, meta, bam]
-                }
-                .combine(ch_primer_bed, by:0)
-                .map { id, meta, bam, meta2, bed ->
-                    [meta, bam, bed]
-                }
-            ch_versions = ch_versions.mix(BEDTOOLS_BAMTOBED.out.versions)
-        } else {
-            ch_primer_bed = file(params.primer_bed, checkIfExists: true)
-                .map { bed ->
-                    def meta = [id: 'primer_bed']
-                return [meta, bed]
-            }
-
-            ch_samtools_ampliconclip_input = ch_combined_bam
-                .combine(ch_primer_bed)
-        }
-
-        SAMTOOLS_AMPLICONCLIP (
-            ch_samtools_ampliconclip_input,
-            true,
-            false
-        )
-
-        ch_clipped_bam = SAMTOOLS_AMPLICONCLIP.out.bam
-        ch_versions = ch_versions.mix(SAMTOOLS_AMPLICONCLIP.out.versions)
-
-        ch_samtools_sort_input = ch_clipped_bam
-            .map {meta, bam ->
-                [meta.id, meta, bam]
-            }
-            .combine(ch_fasta_for_samtools_sort, by:0)
-            .map {id, meta, bam, meta2, fasta ->
-                [meta, bam, fasta]
-            }
-
-        SAMTOOLS_SORT (
-            ch_samtools_sort_input
-        )
-
-        ch_consensus_bam = SAMTOOLS_SORT.out.bam
-        ch_versions = ch_versions.mix(SAMTOOLS_SORT.out.versions)
-
-    } else {
-        ch_primer_bed = Channel.empty()
-        ch_consensus_bam = ch_combined_bam
-    }
+    ch_consensus_bam_long = LONG_READ_MAPPING.out.consensus_bam
+    ch_consensus_bam_short = SHORT_READ_MAPPING.out.consensus_bam
+    ch_consensus_bam = ch_consensus_bam_long.mix(ch_consensus_bam_short)
 
     /*
     ================================================================================
@@ -449,6 +312,32 @@ workflow H2SEQ {
     )
 
     ch_consensus_fa = SAMTOOLS_CONSENSUS.out.fasta
+        .map { meta, fasta ->
+            return [meta.id, meta.long_reads, meta, fasta]
+        }
+    
+    ch_versions = ch_versions.mix(SAMTOOLS_CONSENSUS.out.versions)
+
+    ch_best_ref_txt_keyed = ch_best_ref_txt
+        .map { meta, txt ->
+            return [meta.id, meta.long_reads, meta, txt]
+        }
+
+    ch_split_input = ch_consensus_fa
+        .combine(ch_best_ref_txt_keyed, by:[0,1])
+        .map {id, is_long, meta, fasta, meta2, txt ->
+            [meta, fasta, txt]
+        }
+
+    // split potential multiple consensuses into individual files
+    // the best will be in "*.main.fa"
+    // the others will be in "*.alt#.fa" (e.g. alt1, alt2, ...)
+
+    SPLIT_CONSENSUS_GENOMES (
+        ch_split_input
+    )
+
+    ch_split_consensuses = SPLIT_CONSENSUS_GENOMES.out.fastas
 
     /*
     ================================================================================
@@ -457,11 +346,17 @@ workflow H2SEQ {
     */
 
     if ( params.run_hcv_glue ){
+
         REMOVE_EMPTY_SEQUENCES (
-            ch_consensus_fa
+            ch_split_consensuses
         )
 
+        // Handy hint: transpose operator “transposes” each tuple from a source channel 
+        //      by flattening any nested list in each tuple, emitting each nested item separately.
+        // Practical example: if the channel has [[meta], fasta1, fasta2], then transpose will lead
+        //      to [[[meta], fasta1], [[meta],fasta2]]
         ch_glue_fa = REMOVE_EMPTY_SEQUENCES.out.fasta
+            .transpose()
 
         HCV_GLUE (
             ch_glue_fa
