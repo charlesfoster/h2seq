@@ -24,10 +24,10 @@ process REMOVE_EMPTY_SEQUENCES {
     """
     filter_fasta.py ${prefix} $fasta 
 
-    [ -s 3a_patchy.*main.reporting.fasta ] || find . -name '3a_patchy.*main.reporting.fasta' -exec rm {} +
-    [ -s 3a_patchy.*main.empty.fasta ] || find . -name '3a_patchy.*main.empty.fasta' -exec rm {} +
-    [ -s 3a_patchy.*alt*.reporting.fasta ] || find . -name '3a_patchy.*alt*.reporting.fasta' -exec rm {} +
-    [ -s 3a_patchy.*alt*.empty.fasta ] || find . -name '3a_patchy.*alt*.empty.fasta' -exec rm {} +
+    [ -s ${prefix}.*main.reporting.fasta ] || find . -name '${prefix}.*main.reporting.fasta' -exec rm {} +
+    [ -s ${prefix}.*main.empty.fasta ] || find . -name '${prefix}.*main.empty.fasta' -exec rm {} +
+    [ -s ${prefix}.*alt*.reporting.fasta ] || find . -name '${prefix}.*alt*.reporting.fasta' -exec rm {} +
+    [ -s ${prefix}.*alt*.empty.fasta ] || find . -name '${prefix}.*alt*.empty.fasta' -exec rm {} +
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

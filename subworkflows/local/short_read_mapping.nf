@@ -78,7 +78,7 @@ workflow SHORT_READ_MAPPING {
             // map the primer fasta
             MAP_PRIMERS (
                 ch_bwa_mem_input,
-                false
+                true
             )
             ch_primer_bam = MAP_PRIMERS.out.bam
             ch_versions = ch_versions.mix(MAP_PRIMERS.out.versions)

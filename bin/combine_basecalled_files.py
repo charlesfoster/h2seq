@@ -28,9 +28,9 @@ def combine_fastq_files(fastq_files, output_file, overwrite, compressed):
         sys.exit(1)
 
     if compressed:
-        with gzip.open(output_file, 'wt') as outfile:
+        with gzip.open(output_file, 'wt') as outfile:  # Open the output file in text mode
             for fname in fastq_files:
-                with gzip.open(fname) as infile:
+                with gzip.open(fname, 'rt') as infile:  # Open the input file in text mode
                     for line in infile:
                         outfile.write(line)
     else:
@@ -88,14 +88,20 @@ def main(basecall_default_path, input_path, legacy, overwrite, outdir, compresse
         parent_dir = barcode_dir[0].parent.parent
         summary_file = list(parent_dir.glob('final_summary_*.txt'))
         if not summary_file:
-            raise ValueError(f"No final_summary_*.txt file found in {parent_dir}")
-        
-        instrument, flow_cell_id, protocol = parse_final_summary(summary_file[0])
-
+            # raise ValueError(f"No final_summary_*.txt file found in {parent_dir}")
+            print(f"No final_summary_*.txt file found in {parent_dir}")
+            print(f"Some metadata will be set to 'unknown'")
+        try:
+            instrument, flow_cell_id, protocol = parse_final_summary(summary_file[0])
+        except:
+            instrument, flow_cell_id, protocol = 'unknown', 'unknown', 'unknown'
         fastq_dir = barcode_dir[0]
-        fastq_files = [f for f in fastq_dir.glob('*.fastq') if not f.name.startswith('.')]
+        if not compressed:
+            fastq_files = [f for f in fastq_dir.glob('*.fastq') if not f.name.startswith('.')]
+        else:
+            fastq_files = [f for f in fastq_dir.glob('*.fastq.gz') if not f.name.startswith('.')]
         if not fastq_files:
-            raise ValueError(f"No .fastq files found in {fastq_dir}")
+            raise ValueError(f"No .fastq{{.gz}} files found in {fastq_dir}")
 
         long_reads = Path(outdir) / f"{id}.fastq.gz" if compressed else Path(outdir) / f"{id}.fastq"
         combine_fastq_files(fastq_files, long_reads, overwrite, compressed)
