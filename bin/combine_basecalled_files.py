@@ -101,7 +101,7 @@ def main(basecall_default_path, input_path, legacy, overwrite, outdir, compresse
         else:
             fastq_files = [f for f in fastq_dir.glob('*.fastq.gz') if not f.name.startswith('.')]
         if not fastq_files:
-            raise ValueError(f"No .fastq{{.gz}} files found in {fastq_dir}")
+            raise ValueError(f"No .fastq(.gz) files found in {fastq_dir}")
 
         long_reads = Path(outdir) / f"{id}.fastq.gz" if compressed else Path(outdir) / f"{id}.fastq"
         combine_fastq_files(fastq_files, long_reads, overwrite, compressed)
