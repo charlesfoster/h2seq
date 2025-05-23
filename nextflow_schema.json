@@ -275,7 +275,7 @@
                     "exists": true,
                     "hidden": false,
                     "mimetype": "text/plain",
-                    "pattern": "^\\S+\\.fn?a(sta)?(\\.gz)?$",
+                    "pattern": "^\\S+\\.bed(\\.gz)?$",
                     "description": "Path to BED file with coordinates of amplicon primer sequences to be clipped. Only required if `--primer_fasta` not specified.",
                     "help_text": "Path to BED file with coordinates of amplicon primer sequences to be clipped. This parameter is *mandatory* if `--skip_primer_trimming` is not specified and `--primer_fasta` is not specified.",
                     "fa_icon": "far fa-file-code"
