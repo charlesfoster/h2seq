@@ -193,7 +193,7 @@ def validateInputParameters() {
     }
 
     if (params.skip_reference_selection && !params.reference_fasta) {
-        error("[charlesfoster/h2seq] ERROR: Invalid combination of parameter '--skip_reference_selection' and parameter '--reference_fasta'. If '--skip_reference_selection' is specified, a fasta file must be specified with '--reference_fasta'.")
+        error("[charlesfoster/h2seq] ERROR: Invalid combination of parameter '--skip_reference_selection' and parameter '--reference_fasta'. If '--skip_reference_selection' is NOT specified, a fasta file MUST be specified with '--reference_fasta'.")
     }
 
     // Check if proper files provided for primer clipping

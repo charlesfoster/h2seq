@@ -22,13 +22,13 @@ process REMOVE_EMPTY_SEQUENCES {
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    filter_fasta.py ${prefix} $fasta 
+    filter_fasta.py ${prefix} $fasta
 
     [ -s ${prefix}.*main.reporting.fasta ] || find . -name '${prefix}.*main.reporting.fasta' -exec rm {} +
     [ -s ${prefix}.*main.empty.fasta ] || find . -name '${prefix}.*main.empty.fasta' -exec rm {} +
     [ -s ${prefix}.*alt*.reporting.fasta ] || find . -name '${prefix}.*alt*.reporting.fasta' -exec rm {} +
     [ -s ${prefix}.*alt*.empty.fasta ] || find . -name '${prefix}.*alt*.empty.fasta' -exec rm {} +
-    
+
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         biopython: 1.70

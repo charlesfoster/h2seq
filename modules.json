@@ -84,6 +84,12 @@
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/samtools/ampliconclip/samtools-ampliconclip.diff"
                     },
+                    "samtools/faidx": {
+                        "branch": "master",
+                        "git_sha": "05954dab2ff481bcb999f24455da29a5828af08d",
+                        "installed_by": ["modules"],
+                        "patch": "modules/nf-core/samtools/faidx/samtools-faidx.diff"
+                    },
                     "samtools/sort": {
                         "branch": "master",
                         "git_sha": "04fbbc7c43cebc0b95d5b126f6d9fe4effa33519",

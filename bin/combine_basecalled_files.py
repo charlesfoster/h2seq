@@ -73,7 +73,6 @@ def main(basecall_default_path, input_path, legacy, overwrite, outdir, compresse
             if 'barcode' not in row:
                 raise KeyError(f"'barcode' column is missing in row: {row}")
             row['barcode'] = update_barcode(row['barcode'])
-        
         id = row['id']
         run_name = row['run_name']
         barcode_path = row['barcode']
@@ -105,7 +104,6 @@ def main(basecall_default_path, input_path, legacy, overwrite, outdir, compresse
 
         long_reads = Path(outdir) / f"{id}.fastq.gz" if compressed else Path(outdir) / f"{id}.fastq"
         combine_fastq_files(fastq_files, long_reads, overwrite, compressed)
-        
         csv_rows.append({
             'sample': id,
             'long_reads': long_reads,
@@ -135,6 +133,5 @@ if __name__ == "__main__":
     parser.add_argument("--legacy", action="store_true", help="Use legacy barcode names")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite existing output files")
     parser.add_argument("--compressed", action="store_true", help="Input fastq files are compressed (output will also be compressed)")
-    
     args = parser.parse_args()
     main(args.basecall_default_path, args.input, args.legacy, args.overwrite, args.outdir, args.compressed, args.csv_name)

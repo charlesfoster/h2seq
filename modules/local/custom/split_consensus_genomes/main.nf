@@ -26,7 +26,7 @@ process SPLIT_CONSENSUS_GENOMES {
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         biopython: 1.70
-    END_VERSIONS  
+    END_VERSIONS
     """
     stub:
     def args = task.ext.args ?: ''

@@ -33,7 +33,7 @@ process SAMTOOLS_CONSENSUS {
         $args \\
         -o tmp.fa \\
         $bam
-    
+
     samtools \\
         consensus \\
         --threads ${task.cpus-1} \\

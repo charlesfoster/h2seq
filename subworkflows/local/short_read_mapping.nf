@@ -8,12 +8,11 @@ include { SAMTOOLS_SORT                           } from '../../modules/nf-core/
 
 workflow SHORT_READ_MAPPING {
     take:
-    ch_best_ref_fasta
-    ch_clean_reads
-    ch_primer_fasta
+        ch_best_ref_fasta
+        ch_clean_reads
 
     main:
-    ch_versions = Channel.empty()
+        ch_versions = Channel.empty()
 
     // format the reads for combining
     ch_clean_reads_for_alignment = ch_clean_reads
@@ -71,6 +70,12 @@ workflow SHORT_READ_MAPPING {
             )
             ch_versions = ch_versions.mix(BWA_INDEX.out.versions)
 
+            ch_primer_fasta = Channel.fromPath(params.primer_fasta)
+                .map { fasta ->
+                    def meta = [id: 'primers']
+                    return [meta, fasta]
+                }
+
             // no need to match on a key here --> same primer fasta is recycled for all samples
             ch_bwa_mem_input = ch_primer_fasta
                 .combine(BWA_INDEX.out.fasta_and_index)
@@ -87,7 +92,7 @@ workflow SHORT_READ_MAPPING {
             BEDTOOLS_BAMTOBED (
                 ch_primer_bam
             )
-            
+
             ch_primer_bed = BEDTOOLS_BAMTOBED.out.bed
                 .map { meta, bed ->
                     [ meta.id, meta, bed ]
@@ -105,11 +110,7 @@ workflow SHORT_READ_MAPPING {
                     [meta, bam, bed]
                 }
         } else {
-            ch_primer_bed = file(params.primer_bed, checkIfExists: true)
-                .map { bed ->
-                    def meta = [id: 'primer_bed']
-                return [meta, bed]
-            }
+            ch_primer_bed = Channel.fromPath(params.primer_bed, checkIfExists: true)
 
             ch_samtools_ampliconclip_input = ch_mapped_bam
                 .combine(ch_primer_bed)
@@ -148,6 +149,6 @@ workflow SHORT_READ_MAPPING {
     }
 
     emit:
-    consensus_bam = ch_consensus_bam
-    versions = ch_versions
+        consensus_bam = ch_consensus_bam
+        versions = ch_versions
 }

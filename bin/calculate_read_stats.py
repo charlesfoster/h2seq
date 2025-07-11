@@ -6,9 +6,9 @@ import sys
 def calculate_read_length_stats(fastq_file):
     read_lengths = []
     for record in SeqIO.parse(fastq_file, "fastq"):
-        read_lengths.append(len(record.seq)) 
+        read_lengths.append(len(record.seq))
     mean_length = round(mean(read_lengths))
-    std_dev = round(stdev(read_lengths)) 
+    std_dev = round(stdev(read_lengths))
     return mean_length, std_dev
 
 def write_value(value, filename):

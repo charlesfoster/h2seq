@@ -34,12 +34,9 @@
                 "pattern": "^\\S+\\.f(ast)?q\\.gz$",
                 "dependentRequired": ["short_reads_1"],
                 "errorMessage": "FastQ file for reads 2 cannot contain spaces and must have extension '.fq.gz' or '.fastq.gz'"
-            },
+            }
         },
         "required": ["sample"],
-        "anyOf": [
-            { "required": ["long_reads"] },
-            { "required": ["short_reads_1"] }
-        ]
+        "anyOf": [{ "required": ["long_reads"] }, { "required": ["short_reads_1"] }]
     }
 }

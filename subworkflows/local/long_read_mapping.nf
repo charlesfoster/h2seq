@@ -4,12 +4,13 @@ include { BWA_MEM as MAP_PRIMERS                  } from '../../modules/nf-core/
 include { BEDTOOLS_BAMTOBED                       } from '../../modules/nf-core/bedtools/bamtobed/main'
 include { SAMTOOLS_AMPLICONCLIP                   } from '../../modules/nf-core/samtools/ampliconclip/main'
 include { SAMTOOLS_SORT                           } from '../../modules/nf-core/samtools/sort/main'
+include { CLAIR3                                  } from '../../modules/local/custom/clair3/main'
+include { SAMTOOLS_FAIDX                          } from '../../modules/nf-core/samtools/faidx/main'
 
 workflow LONG_READ_MAPPING {
     take:
     ch_best_ref_fasta
     ch_clean_reads
-    ch_primer_fasta
 
     main:
     ch_versions = Channel.empty()
@@ -59,6 +60,12 @@ workflow LONG_READ_MAPPING {
             )
             ch_versions = ch_versions.mix(BWA_INDEX.out.versions)
 
+            ch_primer_fasta = Channel.fromPath(params.primer_fasta)
+                .map { fasta ->
+                    def meta = [id: 'primers']
+                    return [meta, fasta]
+                }
+
             // no need to match on a key here --> same primer fasta is recycled for all samples
             ch_bwa_mem_input = ch_primer_fasta
                 .combine(BWA_INDEX.out.fasta_and_index)
@@ -75,7 +82,7 @@ workflow LONG_READ_MAPPING {
             BEDTOOLS_BAMTOBED (
                 ch_primer_bam
             )
-            
+
             ch_primer_bed = BEDTOOLS_BAMTOBED.out.bed
                 .map { meta, bed ->
                     [ meta.id, meta, bed ]
@@ -93,11 +100,7 @@ workflow LONG_READ_MAPPING {
                     [meta, bam, bed]
                 }
         } else {
-            ch_primer_bed = file(params.primer_bed, checkIfExists: true)
-                .map { bed ->
-                    def meta = [id: 'primer_bed']
-                return [meta, bed]
-            }
+            ch_primer_bed = Channel.fromPath(params.primer_bed, checkIfExists: true)
 
             ch_samtools_ampliconclip_input = ch_mapped_bam
                 .combine(ch_primer_bed)
@@ -128,7 +131,34 @@ workflow LONG_READ_MAPPING {
         )
 
         ch_consensus_bam = SAMTOOLS_SORT.out.bam
+        ch_consensus_bam_idx = SAMTOOLS_SORT.out.csi
         ch_versions = ch_versions.mix(SAMTOOLS_SORT.out.versions)
+
+        // index best_ref_fasta
+        SAMTOOLS_FAIDX (
+            ch_best_ref_fasta.map { id, meta, idx -> [meta, idx] }
+        )
+
+        ch_best_ref_fasta_idx = SAMTOOLS_FAIDX.out.fa_and_idx
+        ch_versions = ch_versions.mix(SAMTOOLS_FAIDX.out.versions)
+
+        // run clair3
+        ch_clair3_input = ch_consensus_bam
+            .map {meta, bam ->
+                [meta.id, meta, bam]
+            }
+            .combine(ch_consensus_bam_idx.map { meta, idx -> [meta.id, idx] }, by:0)
+            .combine(ch_best_ref_fasta_idx.map { meta, fa, fai -> [meta.id, fa, fai] }, by:0)
+            .map {id, meta, bam, bam_idx, fa, fai ->
+                [meta, bam, bam_idx, fa, fai]
+            }
+
+        CLAIR3 (
+            ch_clair3_input
+        )
+
+        ch_clair3_vcf = CLAIR3.out.vcf
+        ch_versions = ch_versions.mix(CLAIR3.out.versions)
 
     } else {
         ch_primer_bed = Channel.empty()

@@ -45,43 +45,6 @@ include { SPLIT_CONSENSUS_GENOMES   } from '../modules/local/custom/split_consen
 include { LONG_READ_MAPPING        } from '../subworkflows/local/long_read_mapping'
 include { SHORT_READ_MAPPING       } from '../subworkflows/local/short_read_mapping'
 
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    SET UP FILE PATHS
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
-
-if (!params.skip_reference_selection){
-    if ( params.virus_preset == "hcv" ) {
-        possible_references =  "${projectDir}/assets/reference_data/hcv_references.fasta"
-    } else {
-        possible_references = params.possible_references
-    }
-
-    if (possible_references) {
-        ch_reference_fasta = Channel.fromPath(possible_references)
-        ch_reference_fasta = ch_reference_fasta
-            .map { fasta ->
-                def meta = [id: 'possible_references']
-                return [meta, fasta]
-            }
-    } else {
-        ch_reference_fasta = Channel.empty()
-    }
-}
-
-if (params.primer_fasta) {
-    ch_primer_fasta = Channel.fromPath(params.primer_fasta)
-    ch_primer_fasta = ch_primer_fasta
-        .map { fasta ->
-            def meta = [id: 'primers']
-            return [meta, fasta]
-        }
-} else {
-    ch_primer_fasta = Channel.empty()
-}
-
-ch_fastp_adapter_path = params.fastp_adapter_path ? file(params.fastp_adapter_path) : []
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -100,17 +63,48 @@ workflow H2SEQ {
     ch_versions = Channel.empty()
     ch_multiqc_files = Channel.empty()
 
+
+    /*
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        SET UP FILE PATHS
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    */
+
+    if (!params.skip_reference_selection){
+        if ( params.virus_preset == "hcv" ) {
+            possible_references =  "${projectDir}/assets/reference_data/hcv_references.fasta"
+        } else {
+            possible_references = params.possible_references
+        }
+
+        if (possible_references) {
+            ch_reference_fasta = Channel.fromPath(possible_references)
+            ch_reference_fasta = ch_reference_fasta
+                .map { fasta ->
+                    def meta = [id: 'possible_references']
+                    return [meta, fasta]
+                }
+        } else {
+            ch_reference_fasta = Channel.empty()
+        }
+    } else {
+        ch_reference_fasta = Channel.fromPath(params.reference_fasta)
+        ch_reference_fasta = ch_reference_fasta
+            .map { fasta ->
+                def meta = [id: 'best_reference', ref_type: 'BEST']
+                return [meta.id, meta, fasta]
+            }
+    }
+
+    ch_fastp_adapter_path = params.fastp_adapter_path ? file(params.fastp_adapter_path) : []
+
     /*
     ================================================================================
                                     Preprocessing and QC for long reads
     ================================================================================
     */
 
-    FASTQC_RAW_LONG (
-        ch_raw_long_reads
-    )
-    ch_multiqc_files = ch_multiqc_files.mix(FASTQC_RAW_LONG.out.zip.collect{it[1]})
-    ch_versions = ch_versions.mix(FASTQC_RAW_LONG.out.versions.first())
+    // TODO: add an appropriate long read QC tool before trimming
 
     // TODO: add nanoq out to multiqc
     NANOQ (
@@ -120,11 +114,7 @@ workflow H2SEQ {
     ch_clean_reads_long = NANOQ.out.reads
     ch_versions = ch_versions.mix(NANOQ.out.versions)
 
-    FASTQC_TRIMMED_LONG (
-        ch_clean_reads_long
-    )
-    ch_multiqc_files = ch_multiqc_files.mix(FASTQC_TRIMMED_LONG.out.zip.collect{it[1]})
-    ch_versions = ch_versions.mix(FASTQC_TRIMMED_LONG.out.versions.first())
+    // TODO: add an appropriate long read QC tool after trimming
 
     /*
     ================================================================================
@@ -247,6 +237,7 @@ workflow H2SEQ {
         )
 
         ch_best_ref_tsv = SELECT_BEST_REFERENCE.out.best_ref_tsv
+        // TODO: GET THE BEST REF TXT EVEN WHEN SKIPPING REFERENCE SELECTION
         ch_best_ref_txt = SELECT_BEST_REFERENCE.out.best_ref_txt
         ch_alt_ref_txt = SELECT_BEST_REFERENCE.out.alt_ref_txt
         ch_versions = ch_versions.mix(SELECT_BEST_REFERENCE.out.versions)
@@ -271,13 +262,10 @@ workflow H2SEQ {
         ch_best_ref_short = ch_best_ref_fasta
             .filter { id, meta, fasta -> meta.long_reads == false }
     } else {
-        ch_best_ref_fasta = Channel.fromPath(params.reference_fasta)
-            .map { fasta ->
-                def meta = [id: 'best_reference', ref_type: 'BEST']
-                return [meta.id, meta, fasta]
-            }
-        ch_best_ref_long = ch_best_ref_fasta
-        ch_best_ref_short = ch_best_ref_fasta
+        ch_best_ref_long = ch_reference_fasta
+        ch_best_ref_short = ch_reference_fasta
+        ch_best_ref_short.view()
+        ch_best_ref_long.view()
     }
 
     /*
@@ -291,8 +279,8 @@ workflow H2SEQ {
     // Note: here we have separate subworkflows for short and long reads
     //       Might have been able to avoid this with careful multi-key combines (see Consensus section below),
     //       but for sustained development this seemed like a better choice.
-    LONG_READ_MAPPING  ( ch_best_ref_long, ch_clean_reads_long, ch_primer_fasta )
-    SHORT_READ_MAPPING ( ch_best_ref_short, ch_clean_reads_short, ch_primer_fasta )
+    LONG_READ_MAPPING  ( ch_best_ref_long, ch_clean_reads_long )
+    SHORT_READ_MAPPING ( ch_best_ref_short, ch_clean_reads_short )
 
     ch_versions = ch_versions.mix(LONG_READ_MAPPING.out.versions)
     ch_versions = ch_versions.mix(SHORT_READ_MAPPING.out.versions)
@@ -315,7 +303,7 @@ workflow H2SEQ {
         .map { meta, fasta ->
             return [meta.id, meta.long_reads, meta, fasta]
         }
-    
+
     ch_versions = ch_versions.mix(SAMTOOLS_CONSENSUS.out.versions)
 
     ch_best_ref_txt_keyed = ch_best_ref_txt
@@ -351,7 +339,7 @@ workflow H2SEQ {
             ch_split_consensuses
         )
 
-        // Handy hint: transpose operator “transposes” each tuple from a source channel 
+        // Handy hint: transpose operator “transposes” each tuple from a source channel
         //      by flattening any nested list in each tuple, emitting each nested item separately.
         // Practical example: if the channel has [[meta], fasta1, fasta2], then transpose will lead
         //      to [[[meta], fasta1], [[meta],fasta2]]

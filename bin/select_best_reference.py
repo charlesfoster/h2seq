@@ -16,7 +16,7 @@ def parse_args():
 
 def process_data(input_path, salmon, sample_name, top_percent, best_ref_txt, alternate_subtype_txt, output_path, fraction_reads):
     df = pd.read_csv(input_path, sep='\t')
-    
+
     # Update headers based on tool used
     if salmon:
         new_headers = ['target_id', 'length', 'eff_length', 'tpm', 'est_counts']
@@ -26,11 +26,11 @@ def process_data(input_path, salmon, sample_name, top_percent, best_ref_txt, alt
     best_row = df.loc[df['tpm'].idxmax()]
     best_tpm = best_row['tpm']
     best_target_id = best_row['target_id']
-    
+
     # Write the best target id
     with open(best_ref_txt, 'w') as f:
         f.write(f'{best_target_id}\n')
-    
+
     # Extract genotype and subtype
     best_genotype, best_subtype = extract_genotype_subtype(best_target_id)
 
@@ -56,15 +56,15 @@ def process_data(input_path, salmon, sample_name, top_percent, best_ref_txt, alt
         genotype, subtype = extract_genotype_subtype(ch)
         if genotype+subtype != best_genotype+best_subtype:
             other_subtypes.append(ch)
-    
+
     # make sure there are no dupes
     other_subtypes = list(set(other_subtypes))
-    
+
     if len(other_subtypes) > 0:
         print(f"Warning: the main subtype was detected as {best_genotype+best_subtype}, but there are potentially other subtypes present: {', '.join(other_subtypes)}")
-    
+
     with open(alternate_subtype_txt, 'w') as f:
-        # also write in the main subtype to help with read mapping 
+        # also write in the main subtype to help with read mapping
         f.write(f'{best_target_id}\n')
         for st in other_subtypes:
             f.write(f'{st}\n')

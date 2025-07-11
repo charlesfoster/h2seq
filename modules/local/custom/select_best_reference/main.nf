@@ -29,7 +29,7 @@ process SELECT_BEST_REFERENCE {
         --output ${prefix}.best_reference.tsv \\
         --best_ref_txt ${prefix}.best_reference.txt \\
         --alternate_subtype_txt ${prefix}.alternate_subtypes.txt \\
-        $args 
+        $args
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

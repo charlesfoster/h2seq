@@ -1,0 +1,8 @@
+name: samtools_consensus
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - bioconda::clair3=1.1.1-0
+  - bioconda::conda-forge=3.9.0

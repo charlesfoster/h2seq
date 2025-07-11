@@ -296,6 +296,37 @@
                 }
             }
         },
+        "long_read_variant_calling": {
+            "title": "Options for variant calling from long reads",
+            "type": "object",
+            "description": "",
+            "default": "",
+            "fa_icon": "fas fa-bahai",
+            "properties": {
+                "clair3_model_path": {
+                    "type": "string",
+                    "description": "Path to directory containing a Clair3 model for variant calling.",
+                    "default": "/opt/models/r1041_e82_400bps_sup_v410",
+                    "hidden": false,
+                    "help_text": "Default is set to the pre-downloaded model for ONT R10 chemistry with SUP basecalling in the Clair3 container/environment. If using a different model, give the full path to a Clair3 model directory (requiring six files in the folder, including pileup.data-00000-of-00002, pileup.data-00001-of-00002 pileup.index, full_alignment.data-00000-of-00002, full_alignment.data-00001-of-00002 and full_alignment.index) ",
+                    "fa_icon": "fas fa-question-circle"
+                },
+                "clair3_platform": {
+                    "type": "string",
+                    "description": "Sequencing platform: ont, hifi, or ilmn.",
+                    "default": "ont",
+                    "hidden": false,
+                    "fa_icon": "fas fa-question-circle"
+                },
+                "clair3_chunk_size": {
+                    "type": "string",
+                    "description": "Chunk size for Clair3. For viruses, useful to set to the genome size.",
+                    "default": 15000,
+                    "hidden": true,
+                    "fa_icon": "fas fa-question-circle"
+                }
+            }
+        },
         "specialised_options_for_different_viruses": {
             "title": "Specialised options for different viruses",
             "type": "object",
@@ -359,6 +390,34 @@
             "description": "Parameters used to describe centralised config profiles. These should not be edited.",
             "help_text": "The centralised nf-core configuration profiles use a handful of pipeline parameters to describe themselves. This information is then printed to the Nextflow log when you run a pipeline. You should not need to change these values when you run a pipeline.",
             "properties": {
+                "custom_config_version": {
+                    "type": "string",
+                    "description": "Git commit id for Institutional configs.",
+                    "default": "master",
+                    "hidden": true,
+                    "fa_icon": "fas fa-users-cog"
+                },
+                "custom_config_base": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Base directory for Institutional configs.",
+                    "default": "https://raw.githubusercontent.com/nf-core/configs/master",
+                    "hidden": true,
+                    "help_text": "If you're running offline, Nextflow will not be able to fetch the institutional config files from the internet. If you don't need them, then this is not a problem. If you do need them, you should download the files from the repo and tell Nextflow where to find them with this parameter.",
+                    "fa_icon": "fas fa-users-cog"
+                },
+                "config_profile_contact": {
+                    "type": "string",
+                    "description": "Institutional config contact information.",
+                    "hidden": true,
+                    "fa_icon": "fas fa-users-cog"
+                },
+                "config_profile_url": {
+                    "type": "string",
+                    "description": "Institutional config URL link.",
+                    "hidden": true,
+                    "fa_icon": "fas fa-users-cog"
+                },
                 "config_profile_name": {
                     "type": "string",
                     "description": "Institutional config name.",
@@ -539,6 +598,9 @@
         },
         {
             "$ref": "#/definitions/amplicon_workflow_options"
+        },
+        {
+            "$ref": "#/definitions/long_read_variant_calling"
         },
         {
             "$ref": "#/definitions/specialised_options_for_different_viruses"
