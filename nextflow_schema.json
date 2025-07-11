@@ -319,7 +319,7 @@
                     "fa_icon": "fas fa-question-circle"
                 },
                 "clair3_chunk_size": {
-                    "type": "string",
+                    "type": "integer",
                     "description": "Chunk size for Clair3. For viruses, useful to set to the genome size.",
                     "default": 15000,
                     "hidden": true,
