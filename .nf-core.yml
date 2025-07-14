@@ -1,6 +1,5 @@
 lint:
-  nf_test_content:
-    False
+  nf_test_content: False
   files_exist:
     - CODE_OF_CONDUCT.md
     - assets/nf-core-h2seq_logo_light.png
