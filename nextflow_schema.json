@@ -1,10 +1,10 @@
 {
-    "$schema": "https://json-schema.org/draft-07/schema",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://raw.githubusercontent.com/charlesfoster/h2seq/master/nextflow_schema.json",
     "title": "charlesfoster/h2seq pipeline parameters",
     "description": "This pipeline analyses HCV and HIV sequencing data from the H2Seq study",
     "type": "object",
-    "definitions": {
+    "$defs": {
         "input_output_options": {
             "title": "Input/output options",
             "type": "object",
@@ -555,27 +555,6 @@
                     "fa_icon": "fas fa-check-square",
                     "hidden": true
                 },
-                "validationShowHiddenParams": {
-                    "type": "boolean",
-                    "fa_icon": "far fa-eye-slash",
-                    "description": "Show all params when using `--help`",
-                    "hidden": true,
-                    "help_text": "By default, parameters set as _hidden_ in the schema are not shown on the command line when a user runs with `--help`. Specifying this option will tell the pipeline to show all parameters."
-                },
-                "validationFailUnrecognisedParams": {
-                    "type": "boolean",
-                    "fa_icon": "far fa-check-circle",
-                    "description": "Validation of parameters fails when an unrecognised parameter is found.",
-                    "hidden": true,
-                    "help_text": "By default, when an unrecognised parameter is found, it returns a warinig."
-                },
-                "validationLenientMode": {
-                    "type": "boolean",
-                    "fa_icon": "far fa-check-circle",
-                    "description": "Validation of parameters in lenient more.",
-                    "hidden": true,
-                    "help_text": "Allows string values that are parseable as numbers or booleans. For further information see [JSONSchema docs](https://github.com/everit-org/json-schema#lenient-mode)."
-                },
                 "pipelines_testdata_base_path": {
                     "type": "string",
                     "fa_icon": "far fa-check-circle",
@@ -588,34 +567,34 @@
     },
     "allOf": [
         {
-            "$ref": "#/definitions/input_output_options"
+            "$ref": "#/$defs/input_output_options"
         },
         {
-            "$ref": "#/definitions/long_read_quality_control_options"
+            "$ref": "#/$defs/long_read_quality_control_options"
         },
         {
-            "$ref": "#/definitions/short_read_quality_control_options"
+            "$ref": "#/$defs/short_read_quality_control_options"
         },
         {
-            "$ref": "#/definitions/amplicon_workflow_options"
+            "$ref": "#/$defs/amplicon_workflow_options"
         },
         {
-            "$ref": "#/definitions/long_read_variant_calling"
+            "$ref": "#/$defs/long_read_variant_calling"
         },
         {
-            "$ref": "#/definitions/specialised_options_for_different_viruses"
+            "$ref": "#/$defs/specialised_options_for_different_viruses"
         },
         {
-            "$ref": "#/definitions/host_genome_options"
+            "$ref": "#/$defs/host_genome_options"
         },
         {
-            "$ref": "#/definitions/institutional_config_options"
+            "$ref": "#/$defs/institutional_config_options"
         },
         {
-            "$ref": "#/definitions/max_job_request_options"
+            "$ref": "#/$defs/max_job_request_options"
         },
         {
-            "$ref": "#/definitions/generic_options"
+            "$ref": "#/$defs/generic_options"
         }
     ]
 }

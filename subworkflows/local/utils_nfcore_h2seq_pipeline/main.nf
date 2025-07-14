@@ -9,8 +9,8 @@
 */
 
 include { UTILS_NFVALIDATION_PLUGIN } from '../../nf-core/utils_nfvalidation_plugin'
-include { paramsSummaryMap          } from 'plugin/nf-validation'
-include { fromSamplesheet           } from 'plugin/nf-validation'
+include { paramsSummaryMap          } from 'plugin/nf-schema'
+include { samplesheetToList         } from 'plugin/nf-schema'
 include { UTILS_NEXTFLOW_PIPELINE   } from '../../nf-core/utils_nextflow_pipeline'
 include { completionEmail           } from '../../nf-core/utils_nfcore_pipeline'
 include { completionSummary         } from '../../nf-core/utils_nfcore_pipeline'
@@ -78,9 +78,9 @@ workflow PIPELINE_INITIALISATION {
     //
     validateInputParameters()
 
-    // Validate FASTQ input - taken from MAG
+    // Validate FASTQ input 
     ch_samplesheet = Channel
-        .fromSamplesheet("input")
+        .fromList(samplesheetToList("input","${projectDir}/assets/schema_input.json"))
         .map {
             validateInputSamplesheet(it[0], it[1], it[2], it[3])
         }
