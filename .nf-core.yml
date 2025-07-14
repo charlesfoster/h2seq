@@ -1,4 +1,6 @@
 lint:
+  nf_test_content:
+    False
   files_exist:
     - CODE_OF_CONDUCT.md
     - assets/nf-core-h2seq_logo_light.png
@@ -8,6 +10,11 @@ lint:
     - .github/workflows/awstest.yml
     - .github/workflows/awsfulltest.yml
     - conf/igenomes.config
+    - .github/workflows/nf-test.yml
+    - .github/actions/get-shards/action.yml
+    - .github/actions/nf-test/action.yml
+    - nf-test.config
+    - tests/default.nf.test
   files_unchanged:
     - CODE_OF_CONDUCT.md
     - assets/nf-core-h2seq_logo_light.png
@@ -26,7 +33,7 @@ lint:
     - params.max_cpus
     - params.max_memory
     - params.max_time
-nf_core_version: 3.0.2
+nf_core_version: 3.3.2
 repository_type: pipeline
 template:
   prefix: charlesfoster
