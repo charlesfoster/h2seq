@@ -25,7 +25,7 @@ workflow SHORT_READ_MAPPING {
 
     // index the fasta with BWA
     ch_bwa_index_input = ch_best_ref_fasta
-        .map{ id, meta, fasta ->
+        .map{ _id, meta, fasta ->
             [meta, fasta]
         }
 
@@ -42,7 +42,7 @@ workflow SHORT_READ_MAPPING {
 
     ch_alignment_input = ch_clean_reads_for_alignment
         .combine(ch_index_for_combining, by:0)
-        .map{ id, meta1, reads, meta2, fasta, index ->
+        .map{ _id, meta1, reads, meta2, fasta, index ->
             [meta1, reads, meta2, fasta, index]
         }
 
@@ -52,7 +52,7 @@ workflow SHORT_READ_MAPPING {
     )
 
     ch_mapped_bam = BWA_MEM.out.bam
-    ch_mapped_bam_idx = BWA_MEM.out.csi
+    _ch_mapped_bam_idx = BWA_MEM.out.csi
     ch_versions = ch_versions.mix(BWA_MEM.out.versions)
 
     // clip primers if needed
@@ -60,7 +60,7 @@ workflow SHORT_READ_MAPPING {
         if (!params.primer_bed){
             // reshape the channel
             ch_bwa_input_fasta = ch_best_ref_fasta
-                .map{id,meta,fasta ->
+                .map{_id,meta,fasta ->
                     [meta, fasta]
                 }
 
@@ -106,7 +106,7 @@ workflow SHORT_READ_MAPPING {
                     [meta.id, meta, bam]
                 }
                 .combine(ch_primer_bed, by:0)
-                .map { id, meta, bam, meta2, bed ->
+                .map { _id, meta, bam, _meta2, bed ->
                     [meta, bam, bed]
                 }
         } else {
@@ -132,7 +132,7 @@ workflow SHORT_READ_MAPPING {
                 [meta.id, meta, bam]
             }
             .combine(ch_fasta_for_samtools_sort, by:0)
-            .map {id, meta, bam, meta2, fasta ->
+            .map {_id, meta, bam, _meta2, fasta ->
                 [meta, bam, fasta]
             }
 

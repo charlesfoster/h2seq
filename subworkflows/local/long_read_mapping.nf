@@ -24,7 +24,7 @@ workflow LONG_READ_MAPPING {
     // combine with the best ref
     ch_alignment_input = ch_clean_reads_for_alignment
         .combine(ch_best_ref_fasta, by:0)
-        .map{ id, meta1, reads, meta2, fasta ->
+        .map{ _id, meta1, reads, meta2, fasta ->
             [meta1, reads, meta2, fasta]
         }
 
@@ -50,7 +50,7 @@ workflow LONG_READ_MAPPING {
         if (!params.primer_bed){
             // reshape the channel
             ch_bwa_input_fasta = ch_best_ref_fasta
-                .map{id,meta,fasta ->
+                .map{_id,meta,fasta ->
                     [meta, fasta]
                 }
 
@@ -96,7 +96,7 @@ workflow LONG_READ_MAPPING {
                     [meta.id, meta, bam]
                 }
                 .combine(ch_primer_bed, by:0)
-                .map { id, meta, bam, meta2, bed ->
+                .map { _id, meta, bam, _meta2, bed ->
                     [meta, bam, bed]
                 }
         } else {
@@ -122,7 +122,7 @@ workflow LONG_READ_MAPPING {
                 [meta.id, meta, bam]
             }
             .combine(ch_fasta_for_samtools_sort, by:0)
-            .map {id, meta, bam, meta2, fasta ->
+            .map {_id, meta, bam, _meta2, fasta ->
                 [meta, bam, fasta]
             }
 
@@ -133,37 +133,52 @@ workflow LONG_READ_MAPPING {
         ch_consensus_bam = SAMTOOLS_SORT.out.bam
         ch_consensus_bam_idx = SAMTOOLS_SORT.out.csi
         ch_versions = ch_versions.mix(SAMTOOLS_SORT.out.versions)
+    } else {
+        ch_primer_bed = Channel.empty()
 
-        // index best_ref_fasta
-        SAMTOOLS_FAIDX (
-            ch_best_ref_fasta.map { id, meta, idx -> [meta, idx] }
-        )
-
-        ch_best_ref_fasta_idx = SAMTOOLS_FAIDX.out.fa_and_idx
-        ch_versions = ch_versions.mix(SAMTOOLS_FAIDX.out.versions)
-
-        // run clair3
-        ch_clair3_input = ch_consensus_bam
+        // sort the clipped bam
+        ch_samtools_sort_input = ch_mapped_bam
             .map {meta, bam ->
                 [meta.id, meta, bam]
             }
-            .combine(ch_consensus_bam_idx.map { meta, idx -> [meta.id, idx] }, by:0)
-            .combine(ch_best_ref_fasta_idx.map { meta, fa, fai -> [meta.id, fa, fai] }, by:0)
-            .map {id, meta, bam, bam_idx, fa, fai ->
-                [meta, bam, bam_idx, fa, fai]
+            .combine(ch_fasta_for_samtools_sort, by:0)
+            .map {_id, meta, bam, _meta2, fasta ->
+                [meta, bam, fasta]
             }
 
-        CLAIR3 (
-            ch_clair3_input
+        SAMTOOLS_SORT (
+            ch_samtools_sort_input
         )
-
-        ch_clair3_vcf = CLAIR3.out.vcf
-        ch_versions = ch_versions.mix(CLAIR3.out.versions)
-
-    } else {
-        ch_primer_bed = Channel.empty()
-        ch_consensus_bam = ch_mapped_bam
+        ch_consensus_bam = SAMTOOLS_SORT.out.bam
+        ch_consensus_bam_idx = SAMTOOLS_SORT.out.csi
+        ch_versions = ch_versions.mix(SAMTOOLS_SORT.out.versions)
     }
+
+    // index best_ref_fasta
+    SAMTOOLS_FAIDX (
+        ch_best_ref_fasta.map { _id, meta, idx -> [meta, idx] }
+    )
+
+    ch_best_ref_fasta_idx = SAMTOOLS_FAIDX.out.fa_and_idx
+    ch_versions = ch_versions.mix(SAMTOOLS_FAIDX.out.versions)
+
+    // run clair3
+    ch_clair3_input = ch_consensus_bam
+        .map {meta, bam ->
+            [meta.id, meta, bam]
+        }
+        .combine(ch_consensus_bam_idx.map { meta, idx -> [meta.id, idx] }, by:0)
+        .combine(ch_best_ref_fasta_idx.map { meta, fa, fai -> [meta.id, fa, fai] }, by:0)
+        .map {_id, meta, bam, bam_idx, fa, fai ->
+            [meta, bam, bam_idx, fa, fai]
+        }
+
+    CLAIR3 (
+        ch_clair3_input
+    )
+
+    ch_clair3_vcf = CLAIR3.out.vcf
+    ch_versions = ch_versions.mix(CLAIR3.out.versions)
 
     emit:
     consensus_bam = ch_consensus_bam

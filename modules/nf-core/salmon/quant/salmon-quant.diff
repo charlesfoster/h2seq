@@ -1,4 +1,7 @@
-Changes in module 'nf-core/salmon/quant'
+Changes in component 'nf-core/salmon/quant'
+'modules/nf-core/salmon/quant/environment.yml' is unchanged
+'modules/nf-core/salmon/quant/meta.yml' is unchanged
+Changes in 'salmon/quant/main.nf':
 --- modules/nf-core/salmon/quant/main.nf
 +++ modules/nf-core/salmon/quant/main.nf
 @@ -8,15 +8,14 @@
@@ -19,7 +22,17 @@ Changes in module 'nf-core/salmon/quant'
      tuple val(meta), path("*info.json")             , emit: json_info, optional: true
      tuple val(meta), path("*lib_format_counts.json"), emit: lib_format_counts, optional: true
      path  "versions.yml"                            , emit: versions
-@@ -60,7 +59,6 @@
+@@ -29,7 +28,8 @@
+     prefix   = task.ext.prefix ?: "${meta.id}"
+ 
+     def reference   = "--index $index"
+-    def reads1 = [], reads2 = []
++    def reads1 = []
++    def reads2 = []
+     meta.single_end ? [reads].flatten().each{reads1 << it} : reads.eachWithIndex{ v, ix -> ( ix & 1 ? reads2 : reads1) << v }
+     def input_reads = meta.single_end ? "-r ${reads1.join(" ")}" : "-1 ${reads1.join(" ")} -2 ${reads2.join(" ")}"
+     if (alignment_mode) {
+@@ -60,7 +60,6 @@
      }
      """
      salmon quant \\
@@ -27,7 +40,7 @@ Changes in module 'nf-core/salmon/quant'
          --threads $task.cpus \\
          --libType=$strandedness \\
          $reference \\
-@@ -73,6 +71,9 @@
+@@ -73,6 +72,9 @@
      fi
      if [ -f $prefix/lib_format_counts.json ]; then
          cp $prefix/lib_format_counts.json "${prefix}_lib_format_counts.json"
@@ -38,4 +51,8 @@ Changes in module 'nf-core/salmon/quant'
  
      cat <<-END_VERSIONS > versions.yml
 
+'modules/nf-core/salmon/quant/tests/main.nf.test.snap' is unchanged
+'modules/nf-core/salmon/quant/tests/tags.yml' is unchanged
+'modules/nf-core/salmon/quant/tests/nextflow.config' is unchanged
+'modules/nf-core/salmon/quant/tests/main.nf.test' is unchanged
 ************************************************************

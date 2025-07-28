@@ -1,0 +1,20 @@
+Changes in component 'nf-core/nanoq'
+'modules/nf-core/nanoq/environment.yml' is unchanged
+'modules/nf-core/nanoq/meta.yml' is unchanged
+Changes in 'nanoq/main.nf':
+--- modules/nf-core/nanoq/main.nf
++++ modules/nf-core/nanoq/main.nf
+@@ -35,7 +35,7 @@
+     """
+ 
+     stub:
+-    def args = task.ext.args ?: ''
++    def _args = task.ext.args ?: ''
+     def prefix = task.ext.prefix ?: "${meta.id}_filtered"
+     """
+     echo "" | gzip > ${prefix}.$output_format
+
+'modules/nf-core/nanoq/tests/main.nf.test.snap' is unchanged
+'modules/nf-core/nanoq/tests/tags.yml' is unchanged
+'modules/nf-core/nanoq/tests/main.nf.test' is unchanged
+************************************************************

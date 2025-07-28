@@ -52,6 +52,8 @@ include { SHORT_READ_MAPPING       } from '../subworkflows/local/short_read_mapp
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
+//TODO: make sure that the 'ghost' short reads folder isn't created when running long reads only
+//TODO: update README to fully describe the pipeline, its parameters, and its installation
 workflow H2SEQ {
 
     take:
@@ -190,7 +192,7 @@ workflow H2SEQ {
             )
             ch_versions = ch_versions.mix(MINIMAP2_ALIGN_SALMON.out.versions)
             ch_ref_for_salmon = ch_reference_fasta
-                .map { meta, fasta ->
+                .map { _meta, fasta ->
                     [fasta]
                 }
 
@@ -257,10 +259,10 @@ workflow H2SEQ {
             }
 
         ch_best_ref_long = ch_best_ref_fasta
-            .filter { id, meta, fasta -> meta.long_reads == true }
+            .filter { _id, meta, _fasta -> meta.long_reads == true }
 
         ch_best_ref_short = ch_best_ref_fasta
-            .filter { id, meta, fasta -> meta.long_reads == false }
+            .filter { _id, meta, _fasta -> meta.long_reads == false }
     } else {
         ch_best_ref_long = ch_reference_fasta
         ch_best_ref_short = ch_reference_fasta
@@ -313,7 +315,7 @@ workflow H2SEQ {
 
     ch_split_input = ch_consensus_fa
         .combine(ch_best_ref_txt_keyed, by:[0,1])
-        .map {id, is_long, meta, fasta, meta2, txt ->
+        .map {_id, _is_long, meta, fasta, _meta2, txt ->
             [meta, fasta, txt]
         }
 

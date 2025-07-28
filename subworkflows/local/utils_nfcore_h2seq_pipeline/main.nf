@@ -77,7 +77,7 @@ workflow PIPELINE_INITIALISATION {
 
     // Validate FASTQ input
     ch_samplesheet = Channel
-        .fromList(samplesheetToList("input","${projectDir}/assets/schema_input.json"))
+        .fromList(samplesheetToList(params.input,"${projectDir}/assets/schema_input.json"))
         .map {
             validateInputSamplesheet(it[0], it[1], it[2], it[3])
         }
