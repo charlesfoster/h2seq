@@ -30,9 +30,12 @@
    - Soft clipping of primer regions with ([`samtools ampliconclip`](http://www.htslib.org/doc/samtools-ampliconclip.html))
 4. Consensus genome generation with ([`samtools consensus`](http://www.htslib.org/doc/samtools-consensus.html))
 
+> [!IMPORTANT]
+> Additional options have been included over time, and this documentation will be updated accordingly at some stage. For now, just view all possible options by running the `--help` command (see: 'Usage' section below).
+
 ### Metagenomic Sequencing
 
-_TBC_
+Currently there are no 'specialised' modules for metagenomics data. Just run the pipeline as if your reads are derived from amplicon sequencing, but use the `--skip_primer_trimming` option (see: 'Usage' section below).
 
 ### Specialised Modules
 
@@ -42,8 +45,8 @@ Given the initial focus of this pipeline for the H2Seq study, a module has been 
 
 ### Future considerations:
 
-- _variant calling to produce a VCF file instead of/in addition to direct consensus generation_
-- _estimation of the amino acid consequences of SNPs/indels to aid with drug resistance analysis_
+- _variant calling to produce a VCF file instead of/in addition to direct consensus generation_ (currently available with long reads only)
+- _estimation of the amino acid consequences of SNPs/indels to aid with drug resistance analysis_ (currently only provided via the integrated HCV Glue workflow)
 - _placement of input samples into a phylogenetic tree_
 - _host filtration_
 - _use `pycoQC` for Nanopore QC instead of fastQC_
@@ -67,6 +70,9 @@ sample2,sample1.long.fastq.gz,sample1_S1_L002_R1_001.fastq.gz,sample1_S1_L002_R2
 
 Each row points the workflow to fastq files associated with a sample. Each sample can have one long reads file, and one short read fastq file (single-end) or a pair of short read fastq files (paired end).
 
+> [!IMPORTANT]
+> Currently single-end short read functionality is not tested and might not work.
+
 Extra columns can be added to the spreadsheet as required for local purposes (e.g., tracking barcodes/serial numbers etc.), but must occur _after_ the mandatory minimal columns and cannot use any of the mandatory minimal column names.
 
 Now, you can minimally run the pipeline using:
@@ -77,6 +83,9 @@ nextflow run charlesfoster/h2seq \
    --input samplesheet.csv \
    --outdir <OUTDIR>
 ```
+
+> [!IMPORTANT]
+> Development has focused on dependencies being handled by Docker or Singularity, i.e. by including `-profile docker` or `-profile singularity`. Currently `-profile conda` will _NOT_ work, but will work in the future.
 
 Available parameters to be configured can be viewed by running:
 
