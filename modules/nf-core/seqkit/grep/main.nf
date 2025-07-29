@@ -42,12 +42,12 @@ process SEQKIT_GREP {
 
     stub:
     def _args = task.ext.args ?: ''
-    def prefix = task.ext.prefix ?: "${meta.id}"
+    def prefix = task.ext.prefix ?: "${meta2.id}"
     // fasta or fastq. Exact pattern match .fasta or .fa suffix with optional .gz (gzip) suffix
     def suffix = task.ext.suffix ?: "${sequence}" ==~ /(.*f[astn]*a(.gz)?$)/ ? "fa" : "fq"
 
     """
-    echo "" | gzip > ${prefix}.${suffix}.gz
+    touch ${prefix}.best_reference.${suffix}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

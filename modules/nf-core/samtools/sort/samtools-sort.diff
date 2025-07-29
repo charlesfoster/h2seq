@@ -1,4 +1,4 @@
-Changes in module 'nf-core/samtools/sort'
+Changes in component 'nf-core/samtools/sort'
 Changes in 'samtools/sort/environment.yml':
 --- modules/nf-core/samtools/sort/environment.yml
 +++ modules/nf-core/samtools/sort/environment.yml
@@ -37,6 +37,17 @@ Changes in 'samtools/sort/main.nf':
  
      when:
      task.ext.when == null || task.ext.when
+@@ -53,7 +52,9 @@
+     def prefix = task.ext.prefix ?: "${meta.id}"
+     """
+     touch ${prefix}.bam
+-    touch ${prefix}.bam.csi
++    touch ${prefix}.cram
++    touch ${prefix}.crai
++    touch ${prefix}.csi
+ 
+     cat <<-END_VERSIONS > versions.yml
+     "${task.process}":
 
 'modules/nf-core/samtools/sort/tests/main.nf.test.snap' is unchanged
 'modules/nf-core/samtools/sort/tests/tags.yml' is unchanged

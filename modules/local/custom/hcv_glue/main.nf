@@ -21,4 +21,10 @@ process HCV_GLUE {
     sed '/^>/! s/-//g' $fasta > \${BNAME}.tmp.fasta
     docker run --rm --name ${prefix}_${randomName} -v \$PWD:\$PWD -v \$FASTA_DIR:\$FASTA_DIR -w \$PWD --link gluetools-mysql cvrbioinformatics/gluetools:latest gluetools.sh -i project hcv  module phdrReportingController invoke-function reportFastaAsHtml \${BNAME}.tmp.fasta \${BNAME}.html
     """
+
+    stub:
+    def prefix = task.ext.prefix ?: "${meta.id}"
+    """
+    touch ${prefix}.html
+    """
 }

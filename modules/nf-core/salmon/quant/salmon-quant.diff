@@ -50,6 +50,14 @@ Changes in 'salmon/quant/main.nf':
      fi
  
      cat <<-END_VERSIONS > versions.yml
+@@ -87,6 +89,7 @@
+     mkdir ${prefix}
+     touch ${prefix}_meta_info.json
+     touch ${prefix}_lib_format_counts.json
++    touch ${prefix}.salmon_abundance.tsv
+ 
+     cat <<-END_VERSIONS > versions.yml
+     "${task.process}":
 
 'modules/nf-core/salmon/quant/tests/main.nf.test.snap' is unchanged
 'modules/nf-core/salmon/quant/tests/tags.yml' is unchanged

@@ -4,7 +4,7 @@ process CLAIR3 {
 
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularityclair3:1.1.1--py310h779eee5_0' :
+        'https://depot.galaxyproject.org/singularity/clair3:1.1.1--py310h779eee5_0' :
         'docker.io/hkubal/clair3:v1.1.1' }"
 
     input:
@@ -31,6 +31,18 @@ process CLAIR3 {
 
     cp clair3_output/merge_output.vcf.gz ./${prefix}.vcf.gz
     cp clair3_output/merge_output.vcf.gz.tbi ./${prefix}.vcf.gz.tbi
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        clair3: \$(echo \$(/opt/bin/run_clair3.sh --version 2>&1) | sed 's/^.*v//')
+    END_VERSIONS
+    """
+
+    stub:
+    def prefix = task.ext.prefix ?: "${meta.id}"
+    """
+    touch ${prefix}.vcf.gz
+    touch ${prefix}.vcf.gz.tbi
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

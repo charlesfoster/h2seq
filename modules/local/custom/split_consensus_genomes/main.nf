@@ -30,10 +30,10 @@ process SPLIT_CONSENSUS_GENOMES {
     """
     stub:
     def args = task.ext.args ?: ''
-    def prefix = task.ext.prefix ?: "${meta.id}_filtered"
+    def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    touch sample.reference_main.fasta
-    touch sample.reference_alt1.fasta
+    touch ${prefix}.consensus_reference_main.fa
+    touch ${prefix}.consensus_reference_alt1.fa
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

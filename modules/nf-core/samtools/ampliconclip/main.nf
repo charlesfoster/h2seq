@@ -43,4 +43,23 @@ process SAMTOOLS_AMPLICONCLIP {
         samtools: \$(echo \$(samtools --version 2>&1) | sed 's/^.*samtools //; s/Using.*\$//')
     END_VERSIONS
     """
+
+    stub:
+    def prefix = task.ext.prefix ?: "${meta.id}"
+    def rejects_file = save_cliprejects ? "${prefix}.cliprejects.bam" : ""
+    def stats_file = save_clipstats ? "${prefix}.clipstats.txt" : ""
+    """
+    touch ${prefix}.clipallowed.bam
+    if [[ "$rejects_file" != "" ]]; then
+        touch $rejects_file
+    fi
+    if [[ "$stats_file" != "" ]]; then
+        touch $stats_file
+    fi
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        samtools: \$(echo \$(samtools --version 2>&1) | sed 's/^.*samtools //; s/Using.*\$//')
+    END_VERSIONS
+    """
 }

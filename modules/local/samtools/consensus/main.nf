@@ -49,4 +49,18 @@ process SAMTOOLS_CONSENSUS {
         samtools: \$(echo \$(samtools --version 2>&1) | sed 's/^.*samtools //; s/Using.*\$//')
     END_VERSIONS
     """
+
+    stub:
+    def prefix = task.ext.prefix ?: "${meta.id}"
+    """
+    touch ${prefix}.consensus.fa
+    touch ${prefix}.simple_consensus.fa
+    touch ${prefix}.consensus.bam
+    touch ${prefix}.consensus.bam.csi
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        samtools: \$(echo \$(samtools --version 2>&1) | sed 's/^.*samtools //; s/Using.*\$//')
+    END_VERSIONS
+    """
 }

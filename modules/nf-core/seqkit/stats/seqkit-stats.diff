@@ -1,0 +1,27 @@
+Changes in component 'nf-core/seqkit/stats'
+'modules/nf-core/seqkit/stats/environment.yml' is unchanged
+'modules/nf-core/seqkit/stats/meta.yml' is unchanged
+Changes in 'seqkit/stats/main.nf':
+--- modules/nf-core/seqkit/stats/main.nf
++++ modules/nf-core/seqkit/stats/main.nf
+@@ -31,4 +31,15 @@
+         seqkit: \$( seqkit version | sed 's/seqkit v//' )
+     END_VERSIONS
+     """
++
++    stub:
++    def prefix = task.ext.prefix ?: "${meta.id}"
++    """
++    touch '${prefix}.tsv'
++
++    cat <<-END_VERSIONS > versions.yml
++    "${task.process}":
++        seqkit: \$( seqkit version | sed 's/seqkit v//' )
++    END_VERSIONS
++    """
+ }
+
+'modules/nf-core/seqkit/stats/tests/main.nf.test.snap' is unchanged
+'modules/nf-core/seqkit/stats/tests/tags.yml' is unchanged
+'modules/nf-core/seqkit/stats/tests/main.nf.test' is unchanged
+************************************************************
