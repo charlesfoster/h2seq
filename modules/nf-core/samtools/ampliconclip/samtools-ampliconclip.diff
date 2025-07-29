@@ -1,4 +1,22 @@
-Changes in module 'nf-core/samtools/ampliconclip'
+Changes in component 'nf-core/samtools/ampliconclip'
+Changes in 'samtools/ampliconclip/environment.yml':
+--- modules/nf-core/samtools/ampliconclip/environment.yml
++++ modules/nf-core/samtools/ampliconclip/environment.yml
+@@ -1,8 +1,10 @@
+ name: samtools_ampliconclip
++
+ channels:
+   - conda-forge
+   - bioconda
+   - defaults
++
+ dependencies:
++  - bioconda::htslib=1.20
+   - bioconda::samtools=1.20
+-  - bioconda::htslib=1.20
+
+'modules/nf-core/samtools/ampliconclip/meta.yml' is unchanged
+Changes in 'samtools/ampliconclip/main.nf':
 --- modules/nf-core/samtools/ampliconclip/main.nf
 +++ modules/nf-core/samtools/ampliconclip/main.nf
 @@ -1,6 +1,6 @@
@@ -28,20 +46,32 @@ Changes in module 'nf-core/samtools/ampliconclip'
      """
      samtools \\
          ampliconclip \\
-
---- modules/nf-core/samtools/ampliconclip/environment.yml
-+++ modules/nf-core/samtools/ampliconclip/environment.yml
-@@ -1,8 +1,10 @@
- name: samtools_ampliconclip
+@@ -44,4 +43,23 @@
+         samtools: \$(echo \$(samtools --version 2>&1) | sed 's/^.*samtools //; s/Using.*\$//')
+     END_VERSIONS
+     """
 +
- channels:
-   - conda-forge
-   - bioconda
-   - defaults
++    stub:
++    def prefix = task.ext.prefix ?: "${meta.id}"
++    def rejects_file = save_cliprejects ? "${prefix}.cliprejects.bam" : ""
++    def stats_file = save_clipstats ? "${prefix}.clipstats.txt" : ""
++    """
++    touch ${prefix}.clipallowed.bam
++    if [[ "$rejects_file" != "" ]]; then
++        touch $rejects_file
++    fi
++    if [[ "$stats_file" != "" ]]; then
++        touch $stats_file
++    fi
 +
- dependencies:
-+  - bioconda::htslib=1.20
-   - bioconda::samtools=1.20
--  - bioconda::htslib=1.20
++    cat <<-END_VERSIONS > versions.yml
++    "${task.process}":
++        samtools: \$(echo \$(samtools --version 2>&1) | sed 's/^.*samtools //; s/Using.*\$//')
++    END_VERSIONS
++    """
+ }
 
+'modules/nf-core/samtools/ampliconclip/tests/main.nf.test.snap' is unchanged
+'modules/nf-core/samtools/ampliconclip/tests/tags.yml' is unchanged
+'modules/nf-core/samtools/ampliconclip/tests/main.nf.test' is unchanged
 ************************************************************

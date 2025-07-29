@@ -43,6 +43,7 @@ process SELECT_BEST_REFERENCE {
     """
     touch ${prefix}.best_reference.tsv
     touch ${prefix}.best_reference.txt
+    touch ${prefix}.alternate_subtypes.txt
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

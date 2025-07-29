@@ -89,6 +89,7 @@ process SALMON_QUANT {
     mkdir ${prefix}
     touch ${prefix}_meta_info.json
     touch ${prefix}_lib_format_counts.json
+    touch ${prefix}.salmon_abundance.tsv
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

@@ -107,7 +107,8 @@
                     "seqkit/stats": {
                         "branch": "master",
                         "git_sha": "2be41ca2cc780eca4293d1b0dd3850b0b7ac40a3",
-                        "installed_by": ["modules"]
+                        "installed_by": ["modules"],
+                        "patch": "modules/nf-core/seqkit/stats/seqkit-stats.diff"
                     }
                 }
             },

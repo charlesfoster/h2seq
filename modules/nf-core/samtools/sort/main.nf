@@ -52,7 +52,9 @@ process SAMTOOLS_SORT {
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
     touch ${prefix}.bam
-    touch ${prefix}.bam.csi
+    touch ${prefix}.cram
+    touch ${prefix}.crai
+    touch ${prefix}.csi
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
