@@ -79,13 +79,13 @@ Now, you can minimally run the pipeline using:
 
 ```bash
 nextflow run charlesfoster/h2seq \
-   -profile <docker/singularity/...> \
+   -profile <docker/apptainer/...> \
    --input samplesheet.csv \
    --outdir <OUTDIR>
 ```
 
 > [!IMPORTANT]
-> Development has focused on dependencies being handled by Docker or Singularity, i.e. by including `-profile docker` or `-profile singularity`. Currently `-profile conda` will _NOT_ work, but will work in the future.
+> Development has focused on dependencies being handled by Docker or Apptainer, i.e. by including `-profile docker` or `-profile apptainer`. Currently `-profile conda` will _NOT_ work, but will work in the future.
 
 Available parameters to be configured can be viewed by running:
 

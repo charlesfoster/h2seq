@@ -1,0 +1,2 @@
+sample,long_reads,short_reads_1,short_reads_2
+test_input_illumina,,https://github.com/charlesfoster/h2seq/raw/refs/heads/master/test-datasets/test_input_illumina_R1.fastq.gz,https://github.com/charlesfoster/h2seq/raw/refs/heads/master/test-datasets/test_input_illumina_R2.fastq.gz
