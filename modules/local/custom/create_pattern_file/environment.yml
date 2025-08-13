@@ -1,0 +1,7 @@
+name: create_pattern_file
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - coreutils

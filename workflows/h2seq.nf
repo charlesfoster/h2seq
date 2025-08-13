@@ -40,6 +40,7 @@ include { SELECT_BEST_REFERENCE     } from '../modules/local/custom/select_best_
 include { REMOVE_EMPTY_SEQUENCES    } from '../modules/local/custom/remove_empty_sequences/main'
 include { HCV_GLUE                  } from '../modules/local/custom/hcv_glue/main'
 include { SPLIT_CONSENSUS_GENOMES   } from '../modules/local/custom/split_consensus_genomes/main'
+include { CREATE_PATTERN_FILE       } from '../modules/local/custom/create_pattern_file/main'
 
 // local subworkflows //
 include { LONG_READ_MAPPING        } from '../subworkflows/local/long_read_mapping'
@@ -264,10 +265,30 @@ workflow H2SEQ {
         ch_best_ref_short = ch_best_ref_fasta
             .filter { _id, meta, _fasta -> meta.long_reads == false }
     } else {
-        ch_best_ref_long = ch_reference_fasta
-        ch_best_ref_short = ch_reference_fasta
-        ch_best_ref_short.view()
-        ch_best_ref_long.view()
+        // When skipping reference selection, we need to create reference channels
+        // for each sample with the proper structure [sample_id, meta, fasta]
+        // First, get all unique sample IDs from the reads
+        ch_sample_ids = ch_clean_reads_long.mix(ch_clean_reads_short)
+            .map { meta, reads -> meta.id }
+            .unique()
+
+        // Create reference channels by combining sample IDs with the reference fasta
+        // Structure: [sample_id, ref_meta, fasta]
+        ch_best_ref_long = ch_sample_ids
+            .combine(ch_reference_fasta)
+            .map { sample_id, ref_id, ref_meta, fasta ->
+                def new_meta = ref_meta + [long_reads: true]
+                return [sample_id, new_meta, fasta]
+            }
+
+        ch_best_ref_short = ch_sample_ids
+            .combine(ch_reference_fasta)
+            .map { sample_id, ref_id, ref_meta, fasta ->
+                def new_meta = ref_meta + [long_reads: false]
+                return [sample_id, new_meta, fasta]
+            }
+        // ch_best_ref_short.view()
+        // ch_best_ref_long.view()
     }
 
     /*
@@ -308,26 +329,59 @@ workflow H2SEQ {
 
     ch_versions = ch_versions.mix(SAMTOOLS_CONSENSUS.out.versions)
 
-    ch_best_ref_txt_keyed = ch_best_ref_txt
-        .map { meta, txt ->
-            return [meta.id, meta.long_reads, meta, txt]
-        }
+    if (!params.skip_reference_selection){
+        // need to (potentially) split the consensuses into multiple files
+        // only relevant when reference selection is not skipped
+        // can make robust later
+        ch_best_ref_txt_keyed = ch_best_ref_txt
+            .map { meta, txt ->
+                return [meta.id, meta.long_reads, meta, txt]
+            }
 
-    ch_split_input = ch_consensus_fa
-        .combine(ch_best_ref_txt_keyed, by:[0,1])
-        .map {_id, _is_long, meta, fasta, _meta2, txt ->
-            [meta, fasta, txt]
-        }
+        ch_split_input = ch_consensus_fa
+            .combine(ch_best_ref_txt_keyed, by:[0,1])
+            .map {_id, _is_long, meta, fasta, _meta2, txt ->
+                [meta, fasta, txt]
+            }
 
-    // split potential multiple consensuses into individual files
-    // the best will be in "*.main.fa"
-    // the others will be in "*.alt#.fa" (e.g. alt1, alt2, ...)
+        // split potential multiple consensuses into individual files
+        // the best will be in "*.main.fa"
+        // the others will be in "*.alt#.fa" (e.g. alt1, alt2, ...)
 
-    SPLIT_CONSENSUS_GENOMES (
-        ch_split_input
-    )
+        SPLIT_CONSENSUS_GENOMES (
+            ch_split_input
+        )
 
-    ch_split_consensuses = SPLIT_CONSENSUS_GENOMES.out.fastas
+        ch_split_consensuses = SPLIT_CONSENSUS_GENOMES.out.fastas
+    } else {
+        // When reference selection is skipped, still run SPLIT_CONSENSUS_GENOMES
+        // First create pattern files from the reference FASTA
+        ch_reference_for_pattern = ch_reference_fasta
+            .map { ref_id, ref_meta, fasta ->
+                return [ref_meta, fasta]
+            }
+
+        CREATE_PATTERN_FILE (
+            ch_reference_for_pattern
+        )
+        // ch_versions = ch_versions.mix(CREATE_PATTERN_FILE.out.versions)
+
+        // Create pattern files for each sample
+        ch_sample_patterns = ch_consensus_fa
+            .map { meta_id, meta_long_reads, meta, fasta ->
+                return [meta, fasta]
+            }
+            .combine(CREATE_PATTERN_FILE.out.pattern)
+            .map { sample_meta, consensus_fasta, pattern_meta, pattern_file ->
+                return [sample_meta, consensus_fasta, pattern_file]
+            }
+
+        SPLIT_CONSENSUS_GENOMES (
+            ch_sample_patterns
+        )
+
+        ch_split_consensuses = SPLIT_CONSENSUS_GENOMES.out.fastas
+    }
 
     /*
     ================================================================================
