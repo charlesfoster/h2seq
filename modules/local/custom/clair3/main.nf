@@ -11,7 +11,7 @@ process CLAIR3 {
     tuple val(meta), path(bam), path(bam_index), path(fasta), path(fai)
 
     output:
-    tuple val(meta), path("*.vcf.gz"), path("*.tbi") , emit: vcf
+    tuple val(meta), path("*.vcf.gz"), path("*.tbi") , emit: vcf, optional: true
     path "versions.yml"                              , emit: versions
 
     when:
@@ -29,8 +29,13 @@ process CLAIR3 {
         --output=clair3_output \\
         $args
 
-    cp clair3_output/merge_output.vcf.gz ./${prefix}.vcf.gz
-    cp clair3_output/merge_output.vcf.gz.tbi ./${prefix}.vcf.gz.tbi
+    if [ -f "clair3_output/merge_output.vcf.gz" ]; then
+        cp clair3_output/merge_output.vcf.gz ./${prefix}.vcf.gz
+    fi
+
+    if [ -f "clair3_output/merge_output.vcf.gz.tbi" ]; then
+        cp clair3_output/merge_output.vcf.gz.tbi ./${prefix}.vcf.gz.tbi
+    fi
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
