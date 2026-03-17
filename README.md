@@ -1,8 +1,9 @@
 [![GitHub Actions CI Status](https://github.com/charlesfoster/h2seq/actions/workflows/ci.yml/badge.svg)](https://github.com/charlesfoster/h2seq/actions/workflows/ci.yml)
-[![GitHub Actions Linting Status](https://github.com/charlesfoster/h2seq/actions/workflows/linting.yml/badge.svg)](https://github.com/charlesfoster/h2seq/actions/workflows/linting.yml)[![Cite with Zenodo](http://img.shields.io/badge/DOI-10.5281/zenodo.XXXXXXX-1073c8?labelColor=000000)](https://doi.org/10.5281/zenodo.XXXXXXX)
+[![GitHub Actions Linting Status](https://github.com/charlesfoster/h2seq/actions/workflows/linting.yml/badge.svg)](https://github.com/charlesfoster/h2seq/actions/workflows/linting.yml)
 [![nf-test](https://img.shields.io/badge/unit_tests-nf--test-337ab7.svg)](https://www.nf-test.com)
+[![nf-core template](https://img.shields.io/badge/nf--core%20template-3.5.2-%2304B7B4?logo=nf-core&logoColor=white)](https://nf-co.re/)
 
-[![Nextflow](https://img.shields.io/badge/nextflow%20DSL2-%E2%89%A523.10.0-23aa62.svg)](https://www.nextflow.io/)
+[![Nextflow](https://img.shields.io/badge/version-%E2%89%A523.10.0-green?style=flat&logo=nextflow&logoColor=white&color=%230DC09D&link=https%3A%2F%2Fnextflow.io)](https://www.nextflow.io/)
 [![run with conda](http://img.shields.io/badge/run%20with-conda-3EB049?labelColor=000000&logo=anaconda)](https://docs.conda.io/en/latest/)
 [![run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?labelColor=000000&logo=docker)](https://www.docker.com/)
 [![run with singularity](https://img.shields.io/badge/run%20with-singularity-1d355c.svg?labelColor=000000)](https://sylabs.io/docs/)
@@ -28,7 +29,9 @@
 3. Masking of amplicon primer sequences
    - Determination of primer coordinates using ([`bwa`](https://github.com/lh3/bwa)) and ([`bedtools`](https://github.com/arq5x/bedtools2))
    - Soft clipping of primer regions with ([`samtools ampliconclip`](http://www.htslib.org/doc/samtools-ampliconclip.html))
-4. Consensus genome generation with ([`samtools consensus`](http://www.htslib.org/doc/samtools-consensus.html))
+4. Variant-based consensus genome generation with `Clair3` (ONT) or `LoFreq` (Illumina), followed by [`bcftools consensus`](https://samtools.github.io/bcftools/bcftools.html#consensus)
+
+For ONT data, the default `--ont_min_snv_af` is `0.15`. Values below this are not recommended because Clair3 was trained on human data with allele frequencies in the range of 15%-100%.
 
 > [!IMPORTANT]
 > Additional options have been included over time, and this documentation will be updated accordingly at some stage. For now, just view all possible options by running the `--help` command (see: 'Usage' section below).

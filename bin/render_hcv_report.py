@@ -20,6 +20,8 @@ def parse_args():
     parser.add_argument("--pipeline-version", required=True)
     parser.add_argument("--reference-selection-tool", required=True)
     parser.add_argument("--consensus-min-depth", required=True)
+    parser.add_argument("--snv-min-af", required=True)
+    parser.add_argument("--indel-min-af", required=True)
     parser.add_argument("--long-reads-min-len", required=True)
     parser.add_argument("--long-reads-max-len", required=True)
     parser.add_argument("--short-reads-min-len", required=True)
@@ -37,6 +39,8 @@ def read_single_tsv_row(path):
 
 
 def build_summary_sentence(args):
+    snv_af_pct = float(args.snv_min_af) * 100.0
+    indel_af_pct = float(args.indel_min_af) * 100.0
     if args.read_type == "long":
         qc_description = (
             f"Raw reads were quality controlled to retain sequences within the configured long-read length range "
@@ -51,7 +55,8 @@ def build_summary_sentence(args):
     return (
         f"{args.sample_id} was analysed on {date.today().isoformat()} using version v{version} of the H2seq bioinformatics pipeline. "
         f"{qc_description} A closest reference was selected from the configured reference panel based on a read mapping approach, "
-        f"reads were aligned to that reference, and a consensus genome was assembled using a minimum consensus depth of {args.consensus_min_depth}. "
+        f"reads were aligned to that reference, SNVs were retained from a minimum depth of {args.consensus_min_depth} and minimum allele frequency of {snv_af_pct:.1f}%, "
+        f"indels were retained using a minimum allele frequency of {indel_af_pct:.1f}%, and a consensus genome was assembled using a minimum consensus depth of {args.consensus_min_depth}. "
         f"Coding-region coverage metrics were taken from a downstream resistance-analysis report."
     )
 

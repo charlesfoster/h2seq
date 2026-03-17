@@ -4,8 +4,8 @@ process GENERATE_WHOLE_GENOME_BED {
 
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/ubuntu:20.04' :
-        'nf-core/ubuntu:20.04' }"
+        'https://depot.galaxyproject.org/singularity/samtools:1.21--h50ea8bc_0' :
+        'biocontainers/samtools:1.21--h50ea8bc_0' }"
 
     input:
     tuple val(meta), path(reference_fai)
@@ -24,7 +24,7 @@ process GENERATE_WHOLE_GENOME_BED {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        bash: \$(bash --version | head -n 1 | cut -d' ' -f4)
+        samtools_container: 1.21
     END_VERSIONS
     """
 
@@ -37,7 +37,7 @@ process GENERATE_WHOLE_GENOME_BED {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        bash: \$(bash --version | head -n 1 | cut -d' ' -f4)
+        samtools_container: 1.21
     END_VERSIONS
     """
 }

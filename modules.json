@@ -7,106 +7,106 @@
                 "nf-core": {
                     "bedtools/bamtobed": {
                         "branch": "master",
-                        "git_sha": "1d1cb7bfef6cf67fbc7faafa6992ad8bdc3045b3",
+                        "git_sha": "88d43dad73a675e66bff49ebb57fe657a5909018",
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/bedtools/bamtobed/bedtools-bamtobed.diff"
                     },
                     "bwa/index": {
                         "branch": "master",
-                        "git_sha": "e0ff65e1fb313677de09f5f477ae3da30ce19b7b",
+                        "git_sha": "966ba9887e2b04d89d64db06c01508873bde13b1",
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/bwa/index/bwa-index.diff"
                     },
                     "bwa/mem": {
                         "branch": "master",
-                        "git_sha": "e0ff65e1fb313677de09f5f477ae3da30ce19b7b",
+                        "git_sha": "707241c72951f24fd89982c4c80c5983a4c437ef",
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/bwa/mem/bwa-mem.diff"
                     },
                     "fastp": {
                         "branch": "master",
-                        "git_sha": "666652151335353eef2fcd58880bcef5bc2928e1",
+                        "git_sha": "1fb5a73bce8e4ac7079b0a9461b23d11e877ad14",
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/fastp/fastp.diff"
                     },
                     "fastqc": {
                         "branch": "master",
-                        "git_sha": "285a50500f9e02578d90b3ce6382ea3c30216acd",
+                        "git_sha": "f89e009050fa3ea88b81f08a4fc6fe2afbae778b",
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/fastqc/fastqc.diff"
                     },
                     "kallisto/index": {
                         "branch": "master",
-                        "git_sha": "fbe341e9af0bb98533757f536b26d38507d31724",
+                        "git_sha": "447f7bc0fa41dfc2400c8cad4c0291880dc060cf",
                         "installed_by": ["modules"]
                     },
                     "kallisto/quant": {
                         "branch": "master",
-                        "git_sha": "fbe341e9af0bb98533757f536b26d38507d31724",
+                        "git_sha": "77b38f082c32cf86d870802c5dc96b51062c926e",
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/kallisto/quant/kallisto-quant.diff"
                     },
                     "minimap2/align": {
                         "branch": "master",
-                        "git_sha": "e83b347b3e674de6bb1bb7bdf9b2674768c8e0fe",
+                        "git_sha": "5c9f8d5b7671237c906abadc9ff732b301ca15ca",
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/minimap2/align/minimap2-align.diff"
                     },
                     "mosdepth": {
                         "branch": "master",
-                        "git_sha": "e0616fba0919adb190bfe070d17fb12d76ba3a26",
+                        "git_sha": "6832b69ef7f98c54876d6436360b6b945370c615",
                         "installed_by": ["modules"]
                     },
                     "multiqc": {
                         "branch": "master",
-                        "git_sha": "b7ebe95761cd389603f9cc0e0dc384c0f663815a",
+                        "git_sha": "2c73cc8fa92cf48de3da0b643fdf357a8a290b36",
                         "installed_by": ["modules"]
                     },
                     "nanoq": {
                         "branch": "master",
-                        "git_sha": "cf05b61191f5df35cbbf33d47bbf8f22ca0ae0ab",
+                        "git_sha": "cded76e9898609ffef6c8de9f882864e15f55e78",
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/nanoq/nanoq.diff"
                     },
                     "salmon/index": {
                         "branch": "master",
-                        "git_sha": "cb6b2b94fc40dea58f0b1e3dd095f3dd24f2ac8a",
+                        "git_sha": "196cde9b19d49324c5cf10977959f5db856ebbdd",
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/salmon/index/salmon-index.diff"
                     },
                     "salmon/quant": {
                         "branch": "master",
-                        "git_sha": "727232afb8294b53dd9d05bfe469b70cce1675bb",
+                        "git_sha": "9ebc300e05af07c770b86ff089581a2d41346c8b",
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/salmon/quant/salmon-quant.diff"
                     },
                     "samtools/ampliconclip": {
                         "branch": "master",
-                        "git_sha": "04fbbc7c43cebc0b95d5b126f6d9fe4effa33519",
+                        "git_sha": "4e3e10e502ec6ab6b1c4b4fecd923ff1fa287338",
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/samtools/ampliconclip/samtools-ampliconclip.diff"
                     },
                     "samtools/faidx": {
                         "branch": "master",
-                        "git_sha": "05954dab2ff481bcb999f24455da29a5828af08d",
+                        "git_sha": "4e3e10e502ec6ab6b1c4b4fecd923ff1fa287338",
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/samtools/faidx/samtools-faidx.diff"
                     },
                     "samtools/sort": {
                         "branch": "master",
-                        "git_sha": "04fbbc7c43cebc0b95d5b126f6d9fe4effa33519",
+                        "git_sha": "4e3e10e502ec6ab6b1c4b4fecd923ff1fa287338",
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/samtools/sort/samtools-sort.diff"
                     },
                     "seqkit/grep": {
                         "branch": "master",
-                        "git_sha": "2be41ca2cc780eca4293d1b0dd3850b0b7ac40a3",
+                        "git_sha": "149a22b7f9447e73f1f0c34de2e239fdd63af393",
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/seqkit/grep/seqkit-grep.diff"
                     },
                     "seqkit/stats": {
                         "branch": "master",
-                        "git_sha": "2be41ca2cc780eca4293d1b0dd3850b0b7ac40a3",
+                        "git_sha": "bf70cbf44b42ff4a81afcb673fcef604f5ef3a85",
                         "installed_by": ["modules"],
                         "patch": "modules/nf-core/seqkit/stats/seqkit-stats.diff"
                     }

@@ -19,6 +19,8 @@ process RENDER_HCV_REPORT {
     script:
     def prefix = task.ext.prefix ?: "${meta.id}"
     def readType = meta.long_reads ? 'long' : 'short'
+    def snvMinAf = meta.long_reads ? params.ont_min_snv_af : params.illumina_min_snv_af
+    def indelMinAf = meta.long_reads ? params.ont_min_indel_af : params.illumina_min_indel_af
     def renderScriptMtime = file("${projectDir}/bin/render_hcv_report.py").lastModified()
     """
     # render_hcv_report_py_mtime=${renderScriptMtime}
@@ -35,6 +37,8 @@ process RENDER_HCV_REPORT {
         --pipeline-version "${pipeline_version}" \\
         --reference-selection-tool "${params.reference_selection_tool}" \\
         --consensus-min-depth "${params.consensus_min_depth}" \\
+        --snv-min-af "${snvMinAf}" \\
+        --indel-min-af "${indelMinAf}" \\
         --long-reads-min-len "${params.long_reads_min_len}" \\
         --long-reads-max-len "${params.long_reads_max_len}" \\
         --short-reads-min-len "${params.short_reads_min_len}" \\

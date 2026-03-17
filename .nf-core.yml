@@ -15,6 +15,8 @@ lint:
     - nf-test.config
     - tests/default.nf.test
     - .github/workflows/release-announcements.yml
+    - conf/igenomes_ignored.config
+    - ro-crate-metadata.json
   files_unchanged:
     - CODE_OF_CONDUCT.md
     - assets/nf-core-h2seq_logo_light.png
@@ -30,10 +32,11 @@ lint:
     - process.memory
     - process.time
     - custom_config
+    - manifest.version
     - params.max_cpus
     - params.max_memory
     - params.max_time
-nf_core_version: 3.3.2
+nf_core_version: 3.5.2
 repository_type: pipeline
 template:
   prefix: charlesfoster

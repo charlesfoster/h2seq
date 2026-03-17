@@ -55,12 +55,10 @@ workflow SHORT_READ_MAPPING {
 
     ch_consensus_bam = PREPARE_CONSENSUS_BAM.out.consensus_bam
     ch_consensus_bam_idx = PREPARE_CONSENSUS_BAM.out.consensus_bam_idx
-    ch_amplicon_bed = PREPARE_CONSENSUS_BAM.out.amplicon_bed
     ch_versions = ch_versions.mix(PREPARE_CONSENSUS_BAM.out.versions)
 
     emit:
         consensus_bam = ch_consensus_bam
         consensus_bam_idx = ch_consensus_bam_idx
-        amplicon_bed = ch_amplicon_bed
         versions = ch_versions
 }

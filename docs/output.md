@@ -73,7 +73,9 @@ Typical contents:
 
 ### `variant_calling`
 
-Currently produced for the long-read workflow via `Clair3`.
+Contains intermediate and final files from the variant-calling and consensus workflow.
+
+If `--majority_allele_consensus` is enabled, the final consensus contains no IUPAC ambiguity codes. In that mode, only majority variants with allele frequency `>= 0.5` are incorporated into the consensus, regardless of lower user-supplied SNV or indel thresholds.
 
 ### `reporting`
 
@@ -135,4 +137,4 @@ Not every sample will produce every file. Negative controls and failed libraries
 
 - the pipeline continues
 - downstream sample outputs may be absent
-- the reason should be visible in `run_summary/run_summary.csv`
+- the reason should be visible in `combined_results_summary.csv`

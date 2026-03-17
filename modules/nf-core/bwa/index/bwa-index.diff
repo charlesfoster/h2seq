@@ -1,4 +1,7 @@
-Changes in module 'nf-core/bwa/index'
+Changes in component 'nf-core/bwa/index'
+'modules/nf-core/bwa/index/environment.yml' is unchanged
+'modules/nf-core/bwa/index/meta.yml' is unchanged
+Changes in 'bwa/index/main.nf':
 --- modules/nf-core/bwa/index/main.nf
 +++ modules/nf-core/bwa/index/main.nf
 @@ -11,7 +11,7 @@
@@ -11,4 +14,7 @@ Changes in module 'nf-core/bwa/index'
  
      when:
 
+'modules/nf-core/bwa/index/tests/main.nf.test.snap' is unchanged
+'modules/nf-core/bwa/index/tests/tags.yml' is unchanged
+'modules/nf-core/bwa/index/tests/main.nf.test' is unchanged
 ************************************************************

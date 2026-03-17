@@ -1,4 +1,4 @@
-Changes in module 'nf-core/fastp'
+Changes in component 'nf-core/fastp'
 'modules/nf-core/fastp/environment.yml' is unchanged
 'modules/nf-core/fastp/meta.yml' is unchanged
 Changes in 'fastp/main.nf':

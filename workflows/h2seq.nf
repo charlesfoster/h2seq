@@ -39,7 +39,6 @@ include { BEDTOOLS_BAMTOBED                       } from '../modules/nf-core/bed
 include { SAMTOOLS_FAIDX                          } from '../modules/nf-core/samtools/faidx/main'
 
 // local modules //
-include { SAMTOOLS_CONSENSUS        } from '../modules/local/samtools/consensus/main'
 include { CALCULATE_READ_STATS      } from '../modules/local/custom/calculate_read_stats/main'
 include { SELECT_BEST_REFERENCE     } from '../modules/local/custom/select_best_reference/main'
 include { REMOVE_EMPTY_SEQUENCES    } from '../modules/local/custom/remove_empty_sequences/main'
@@ -48,9 +47,19 @@ include { SPLIT_CONSENSUS_GENOMES   } from '../modules/local/custom/split_consen
 include { CREATE_PATTERN_FILE       } from '../modules/local/custom/create_pattern_file/main'
 include { COVERAGE_METRICS          } from '../modules/local/custom/coverage_metrics/main'
 include { BUILD_RUN_SUMMARY         } from '../modules/local/custom/build_run_summary/main'
+include { BUILD_MULTIQC_SECTIONS    } from '../modules/local/custom/build_multiqc_sections/main'
 include { COUNT_MAPPED_READS        } from '../modules/local/custom/count_mapped_reads/main'
 include { REFERENCE_METADATA_FROM_FASTA } from '../modules/local/custom/reference_metadata_from_fasta/main'
 include { GENERATE_WHOLE_GENOME_BED } from '../modules/local/custom/generate_whole_genome_bed/main'
+include { LOFREQ_INDELQUAL          } from '../modules/local/custom/lofreq_indelqual/main'
+include { LOFREQ_CALL               } from '../modules/local/custom/lofreq_call/main'
+include { PREPARE_CLAIR3_VCF        } from '../modules/local/custom/prepare_clair3_vcf/main'
+include { PREPARE_LOFREQ_VCF        } from '../modules/local/custom/prepare_lofreq_vcf/main'
+include { FILTER_VARIANTS           } from '../modules/local/custom/filter_variants/main'
+include { ANNOTATE_VARIANTS         } from '../modules/local/custom/annotate_variants/main'
+include { CREATE_CONSENSUS_MASK     } from '../modules/local/custom/create_consensus_mask/main'
+include { BCFTOOLS_CONSENSUS        } from '../modules/local/custom/bcftools_consensus/main'
+include { CLAIR3                    } from '../modules/local/custom/clair3/main'
 include { PARSE_HCV_GLUE_COVERAGE   } from '../modules/local/custom/parse_hcv_glue_coverage/main'
 include { PLOT_HCV_SUMMARY          } from '../modules/local/custom/plot_hcv_summary/main'
 include { RENDER_HCV_REPORT         } from '../modules/local/custom/render_hcv_report/main'
@@ -360,7 +369,6 @@ workflow H2SEQ {
             ch_abundance_tsv_long = SALMON_QUANT_LONG.out.tsv
 
             // Focus on (potential) short reads second
-
             SALMON_INDEX (
                 ch_ref_for_salmon
             )
@@ -467,11 +475,8 @@ workflow H2SEQ {
     ch_consensus_bam_short = SHORT_READ_MAPPING.out.consensus_bam
     ch_consensus_bam_idx_long = LONG_READ_MAPPING.out.consensus_bam_idx
     ch_consensus_bam_idx_short = SHORT_READ_MAPPING.out.consensus_bam_idx
-    ch_amplicon_bed_long = LONG_READ_MAPPING.out.amplicon_bed
-    ch_amplicon_bed_short = SHORT_READ_MAPPING.out.amplicon_bed
     ch_consensus_bam = ch_consensus_bam_long.mix(ch_consensus_bam_short)
     ch_consensus_bam_idx = ch_consensus_bam_idx_long.mix(ch_consensus_bam_idx_short)
-    ch_amplicon_bed = ch_amplicon_bed_long.mix(ch_amplicon_bed_short)
 
     COUNT_MAPPED_READS (
         ch_consensus_bam
@@ -532,8 +537,8 @@ workflow H2SEQ {
             },
             by: [0, 1]
         )
-        .map { _id, _long_reads, meta, bam, _meta2, idx, _meta3, bed ->
-            [meta, bam, idx, bed]
+        .map { _id, _long_reads, meta, bam, _meta2, idx, refMeta, bed ->
+            [meta + [reference_name: refMeta.reference_name], bam, idx, bed]
         }
 
     ch_mosdepth_reference = ch_reference_fai
@@ -570,20 +575,125 @@ workflow H2SEQ {
 
     /*
     ================================================================================
-                                    Consensus generation
+                                    Variant calling and consensus generation
     ================================================================================
     */
 
-    SAMTOOLS_CONSENSUS (
-        ch_consensus_bam_ready
-    )
+    ch_variant_call_input = ch_consensus_bam_ready
+        .map { meta, bam ->
+            [meta.id, meta.long_reads, meta, bam]
+        }
+        .combine(
+            ch_consensus_bam_idx.map { meta, idx ->
+                [meta.id, meta.long_reads, meta, idx]
+            },
+            by: [0, 1]
+        )
+        .combine(
+            ch_reference_fai.map { _id, _long_reads, meta, fasta, fai ->
+                [meta.id, meta.long_reads, meta, fasta, fai]
+            },
+            by: [0, 1]
+        )
+        .map { _id, _long_reads, meta, bam, _meta2, bam_idx, refMeta, fasta, fai ->
+            [meta + [reference_name: refMeta.reference_name], bam, bam_idx, fasta, fai]
+        }
 
-    ch_consensus_fa = SAMTOOLS_CONSENSUS.out.fasta
+    ch_clair3_input = ch_variant_call_input
+        .filter { meta, _bam, _bam_idx, _fasta, _fai -> meta.long_reads }
+
+    CLAIR3 (
+        ch_clair3_input
+    )
+    ch_versions = ch_versions.mix(CLAIR3.out.versions)
+
+    PREPARE_CLAIR3_VCF (
+        CLAIR3.out.vcf
+    )
+    ch_versions = ch_versions.mix(PREPARE_CLAIR3_VCF.out.versions)
+
+    ch_lofreq_indelqual_input = ch_variant_call_input
+        .filter { meta, _bam, _bam_idx, _fasta, _fai -> !meta.long_reads }
+        .map { meta, bam, _bam_idx, fasta, _fai ->
+            [meta, bam, fasta]
+        }
+
+    LOFREQ_INDELQUAL (
+        ch_lofreq_indelqual_input
+    )
+    ch_versions = ch_versions.mix(LOFREQ_INDELQUAL.out.versions)
+
+    ch_lofreq_call_input = LOFREQ_INDELQUAL.out.bam
+        .map { meta, bam, bai ->
+            [meta.id, meta.long_reads, meta, bam, bai]
+        }
+        .combine(
+            ch_reference_fai.map { _id, _long_reads, meta, fasta, _fai ->
+                [meta.id, meta.long_reads, meta, fasta]
+            },
+            by: [0, 1]
+        )
+        .map { _id, _long_reads, meta, bam, bai, _meta2, fasta ->
+            [meta, bam, bai, fasta]
+        }
+
+    LOFREQ_CALL (
+        ch_lofreq_call_input
+    )
+    ch_versions = ch_versions.mix(LOFREQ_CALL.out.versions)
+
+    PREPARE_LOFREQ_VCF (
+        LOFREQ_CALL.out.vcf
+    )
+    ch_versions = ch_versions.mix(PREPARE_LOFREQ_VCF.out.versions)
+
+    ch_prepared_variants = PREPARE_CLAIR3_VCF.out.vcf
+        .mix(PREPARE_LOFREQ_VCF.out.vcf)
+
+    FILTER_VARIANTS (
+        ch_prepared_variants
+    )
+    ch_versions = ch_versions.mix(FILTER_VARIANTS.out.versions)
+
+    ANNOTATE_VARIANTS (
+        FILTER_VARIANTS.out.vcf
+    )
+    ch_versions = ch_versions.mix(ANNOTATE_VARIANTS.out.versions)
+
+    CREATE_CONSENSUS_MASK (
+        MOSDEPTH_GENOME.out.per_base_bed
+    )
+    ch_versions = ch_versions.mix(CREATE_CONSENSUS_MASK.out.versions)
+
+    ch_bcftools_consensus_input = FILTER_VARIANTS.out.vcf
+        .map { meta, vcf, vcf_idx ->
+            [meta.id, meta.long_reads, meta, vcf, vcf_idx]
+        }
+        .combine(
+            ch_reference_fai.map { _id, _long_reads, meta, fasta, _fai ->
+                [meta.id, meta.long_reads, meta, fasta]
+            },
+            by: [0, 1]
+        )
+        .combine(
+            CREATE_CONSENSUS_MASK.out.bed.map { meta, mask_bed ->
+                [meta.id, meta.long_reads, meta, mask_bed]
+            },
+            by: [0, 1]
+        )
+        .map { _id, _long_reads, meta, vcf, vcf_idx, refMeta, fasta, _meta3, mask_bed ->
+            [meta + [reference_name: refMeta.reference_name], vcf, vcf_idx, fasta, mask_bed]
+        }
+
+    BCFTOOLS_CONSENSUS (
+        ch_bcftools_consensus_input
+    )
+    ch_versions = ch_versions.mix(BCFTOOLS_CONSENSUS.out.versions)
+
+    ch_consensus_fa = BCFTOOLS_CONSENSUS.out.fasta
         .map { meta, fasta ->
             return [meta.id, meta.long_reads, meta, fasta]
         }
-
-    ch_versions = ch_versions.mix(SAMTOOLS_CONSENSUS.out.versions)
 
     if (!params.skip_reference_selection){
         // need to (potentially) split the consensuses into multiple files
@@ -761,6 +871,11 @@ workflow H2SEQ {
         workflow.manifest.version ?: ""
     )
 
+    BUILD_MULTIQC_SECTIONS (
+        ch_summary_triggers.collect(),
+        file(params.outdir).toString()
+    )
+
     /*
     ================================================================================
                                     Version parsing and MultiQC
@@ -805,6 +920,9 @@ workflow H2SEQ {
     ch_multiqc_files = ch_multiqc_files.mix(ch_short_raw_stats.collect { it[1] })
     ch_multiqc_files = ch_multiqc_files.mix(ch_short_clean_stats.collect { it[1] })
     ch_multiqc_files = ch_multiqc_files.mix(BUILD_RUN_SUMMARY.out.mqc)
+    ch_multiqc_files = ch_multiqc_files.mix(BUILD_MULTIQC_SECTIONS.out.coverage)
+    ch_multiqc_files = ch_multiqc_files.mix(BUILD_MULTIQC_SECTIONS.out.read_stats)
+    ch_multiqc_files = ch_multiqc_files.mix(BUILD_MULTIQC_SECTIONS.out.variants)
     ch_multiqc_files = ch_multiqc_files.mix(
         ch_workflow_summary.collectFile(name: 'workflow_summary_mqc.yaml'))
     ch_multiqc_files = ch_multiqc_files.mix(ch_collated_versions)
