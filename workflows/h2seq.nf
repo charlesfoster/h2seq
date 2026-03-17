@@ -923,6 +923,9 @@ workflow H2SEQ {
     ch_multiqc_files = ch_multiqc_files.mix(BUILD_MULTIQC_SECTIONS.out.coverage)
     ch_multiqc_files = ch_multiqc_files.mix(BUILD_MULTIQC_SECTIONS.out.read_stats)
     ch_multiqc_files = ch_multiqc_files.mix(BUILD_MULTIQC_SECTIONS.out.variants)
+    if (params.virus_preset == "hcv" && params.run_hcv_glue) {
+        ch_multiqc_files = ch_multiqc_files.mix(BUILD_MULTIQC_SECTIONS.out.region_coverage)
+    }
     ch_multiqc_files = ch_multiqc_files.mix(
         ch_workflow_summary.collectFile(name: 'workflow_summary_mqc.yaml'))
     ch_multiqc_files = ch_multiqc_files.mix(ch_collated_versions)

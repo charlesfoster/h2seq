@@ -4,13 +4,30 @@ import csv
 import json
 from pathlib import Path
 
+import matplotlib.pyplot as plt
+
 MOSDEPTH_COVERAGE_THRESHOLDS = [1, 5, 10, 20, 30, 50, 100]
+HCV_FEATURES = [
+    "Polyprotein",
+    "Core",
+    "E1",
+    "E2",
+    "p7",
+    "NS2",
+    "NS3",
+    "NS4A",
+    "NS4B",
+    "NS5A",
+    "NS5B",
+]
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Build custom MultiQC sections from pipeline outputs.")
     parser.add_argument("--outdir", required=True)
     parser.add_argument("--coverage-output", required=True)
+    parser.add_argument("--region-coverage-output", required=True)
+    parser.add_argument("--region-coverage-pdf-output", required=True)
     parser.add_argument("--read-output", required=True)
     parser.add_argument("--variant-output", required=True)
     return parser.parse_args()
@@ -303,6 +320,61 @@ def build_variant_section(outdir):
     }
 
 
+def build_region_coverage_rows(outdir):
+    rows = {}
+
+    for path in sorted(outdir.rglob("*.hcv_glue_coverage.tsv")):
+        for record in load_tsv_rows(path):
+            sample_id = record.get("sample_id", "")
+            read_type = record.get("read_type", "")
+            feature = record.get("feature", "")
+            if feature not in HCV_FEATURES:
+                continue
+            key = (sample_id, read_type)
+            rows.setdefault(key, {"sample_id": sample_id, "read_type": read_type})
+            rows[key][feature] = to_float(record.get("coverage_pct"), None)
+
+    return rows
+
+def write_region_coverage_heatmap(path, outdir):
+    rows = build_region_coverage_rows(outdir)
+
+    if not rows:
+        fig, ax = plt.subplots(figsize=(6, 1.8), dpi=300)
+        ax.axis("off")
+        ax.text(0.5, 0.5, "No HCV-GLUE region coverage available", ha="center", va="center", fontsize=11)
+        fig.tight_layout()
+        fig.savefig(path, dpi=300, bbox_inches="tight")
+        plt.close(fig)
+        return
+
+    ordered_rows = [rows[key] for key in sorted(rows)]
+    sample_labels = [row_label(row["sample_id"], row["read_type"]) for row in ordered_rows]
+    matrix = [[row.get(feature, 0.0) if row.get(feature, None) is not None else float("nan") for feature in HCV_FEATURES] for row in ordered_rows]
+
+    fig_height = max(2.6, 0.55 * len(sample_labels) + 1.8)
+    fig, ax = plt.subplots(figsize=(10.5, fig_height), dpi=300)
+    cmap = plt.cm.YlGnBu.copy()
+    cmap.set_bad(color="#f2f2f2")
+    image = ax.imshow(matrix, aspect="auto", cmap=cmap, vmin=0, vmax=100)
+    ax.set_title("Coverage Per Genomic Region", fontsize=13, weight="bold", pad=12)
+    ax.set_xticks(range(len(HCV_FEATURES)))
+    ax.set_xticklabels(HCV_FEATURES, rotation=45, ha="right")
+    ax.set_yticks(range(len(sample_labels)))
+    ax.set_yticklabels(sample_labels)
+
+    for row_idx, row in enumerate(matrix):
+        for col_idx, value in enumerate(row):
+            if value == value:
+                ax.text(col_idx, row_idx, f"{value:.1f}", ha="center", va="center", fontsize=7, color="black")
+
+    cbar = fig.colorbar(image, ax=ax, fraction=0.03, pad=0.02)
+    cbar.set_label("Coverage (%)")
+    fig.tight_layout()
+    fig.savefig(path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+
 def write_json(path, payload):
     with open(path, "w") as handle:
         json.dump(payload, handle, indent=2)
@@ -312,6 +384,8 @@ def main():
     args = parse_args()
     outdir = Path(args.outdir)
     write_json(args.coverage_output, build_coverage_section(outdir))
+    write_region_coverage_heatmap(args.region_coverage_output, outdir)
+    write_region_coverage_heatmap(args.region_coverage_pdf_output, outdir)
     write_json(args.read_output, build_read_section(outdir))
     write_json(args.variant_output, build_variant_section(outdir))
 
