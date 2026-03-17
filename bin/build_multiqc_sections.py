@@ -4,6 +4,8 @@ import csv
 import json
 from pathlib import Path
 
+MOSDEPTH_COVERAGE_THRESHOLDS = [1, 5, 10, 20, 30, 50, 100]
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Build custom MultiQC sections from pipeline outputs.")
@@ -63,7 +65,7 @@ def to_int(value, default=None):
 
 
 def parse_mosdepth_global_dist(path):
-    target_fraction = None
+    coverage_pct_by_threshold = {depth: None for depth in MOSDEPTH_COVERAGE_THRESHOLDS}
     median_depth = 0
 
     with open(path) as handle:
@@ -76,15 +78,15 @@ def parse_mosdepth_global_dist(path):
                 continue
             depth = int(depth)
             fraction = float(fraction)
-            if depth == 10:
-                target_fraction = fraction * 100.0
+            if depth in coverage_pct_by_threshold:
+                coverage_pct_by_threshold[depth] = fraction * 100.0
             if fraction >= 0.5 and depth > median_depth:
                 median_depth = depth
 
-    return {
-        "coverage_10x_pct": target_fraction if target_fraction is not None else 0.0,
-        "median_coverage": median_depth,
-    }
+    summary = {"median_coverage": median_depth}
+    for depth, value in coverage_pct_by_threshold.items():
+        summary[f"coverage_{depth}x_pct"] = value if value is not None else 0.0
+    return summary
 
 
 def parse_mosdepth_summary(path):
@@ -120,13 +122,34 @@ def build_coverage_section(outdir):
     for key in sorted(rows):
         row = rows[key]
         table_data[row_label(row["sample_id"], row["read_type"])] = {
-            "coverage_10x_pct": row.get("coverage_10x_pct", ""),
             "median_coverage": row.get("median_coverage", ""),
             "mean_coverage": row.get("mean_coverage", ""),
             "min_coverage": row.get("min_coverage", ""),
             "max_coverage": row.get("max_coverage", ""),
             "genome_length": row.get("genome_length", ""),
         }
+        for depth in MOSDEPTH_COVERAGE_THRESHOLDS:
+            table_data[row_label(row["sample_id"], row["read_type"])][f"coverage_{depth}x_pct"] = row.get(
+                f"coverage_{depth}x_pct", ""
+            )
+
+    headers = {}
+    for depth in MOSDEPTH_COVERAGE_THRESHOLDS:
+        headers[f"coverage_{depth}x_pct"] = {
+            "title": f"≥ {depth}X",
+            "format": "{:,.1f}",
+            "suffix": "%",
+            "hidden": depth != 10,
+        }
+    headers.update(
+        {
+            "median_coverage": {"title": "Median", "format": "{:,.1f}X"},
+            "mean_coverage": {"title": "Mean Cov.", "format": "{:,.1f}"},
+            "min_coverage": {"title": "Min Cov.", "format": "{:,.1f}"},
+            "max_coverage": {"title": "Max Cov.", "format": "{:,.1f}"},
+            "genome_length": {"title": "Genome length"},
+        }
+    )
 
     return {
         "id": "h2seq_coverage_statistics",
@@ -137,14 +160,7 @@ def build_coverage_section(outdir):
             "id": "h2seq_coverage_statistics_table",
             "title": "Coverage Statistics",
         },
-        "headers": {
-            "coverage_10x_pct": {"title": "≥ 10X", "format": "{:,.1f}", "suffix": "%"},
-            "median_coverage": {"title": "Median", "format": "{:,.1f}X"},
-            "mean_coverage": {"title": "Mean Cov.", "format": "{:,.1f}"},
-            "min_coverage": {"title": "Min Cov.", "format": "{:,.1f}"},
-            "max_coverage": {"title": "Max Cov.", "format": "{:,.1f}"},
-            "genome_length": {"title": "Genome length"},
-        },
+        "headers": headers,
         "data": table_data,
     }
 
