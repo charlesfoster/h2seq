@@ -35,7 +35,10 @@ process SEQKIT_STATS {
     stub:
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    touch '${prefix}.tsv'
+    cat <<-END_STATS > '${prefix}.tsv'
+    file	format	type	num_seqs	sum_len	min_len	avg_len	max_len
+    ${prefix}	fastq	DNA	1	100	100	100	100
+    END_STATS
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

@@ -80,6 +80,14 @@
                     "fa_icon": "fas fa-file-code",
                     "hidden": false,
                     "help_text": "Maximum read length to retain during QC filtering."
+                },
+                "long_reads_min_qual": {
+                    "type": "number",
+                    "description": "Minimum average long-read quality to retain during QC filtering.",
+                    "default": 9,
+                    "fa_icon": "fas fa-signal",
+                    "hidden": false,
+                    "help_text": "Minimum average long-read quality to retain during QC filtering."
                 }
             }
         },

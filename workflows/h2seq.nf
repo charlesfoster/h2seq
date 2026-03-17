@@ -17,6 +17,10 @@ include { paramsSummaryMultiqc                    } from '../subworkflows/nf-cor
 include { softwareVersionsToYAML                  } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { methodsDescriptionText                  } from '../subworkflows/local/utils_nfcore_h2seq_pipeline'
 include { NANOQ                                   } from '../modules/nf-core/nanoq/main'
+include { SEQKIT_STATS as SEQKIT_STATS_RAW_LONG   } from '../modules/nf-core/seqkit/stats/main'
+include { SEQKIT_STATS as SEQKIT_STATS_CLEAN_LONG } from '../modules/nf-core/seqkit/stats/main'
+include { SEQKIT_STATS as SEQKIT_STATS_RAW_SHORT  } from '../modules/nf-core/seqkit/stats/main'
+include { SEQKIT_STATS as SEQKIT_STATS_CLEAN_SHORT } from '../modules/nf-core/seqkit/stats/main'
 include { KALLISTO_INDEX                          } from '../modules/nf-core/kallisto/index/main'
 include { KALLISTO_QUANT                          } from '../modules/nf-core/kallisto/quant/main'
 include { SALMON_INDEX                            } from '../modules/nf-core/salmon/index/main'
@@ -26,12 +30,13 @@ include { MINIMAP2_ALIGN                          } from '../modules/nf-core/min
 include { MINIMAP2_ALIGN as MINIMAP2_ALIGN_SALMON } from '../modules/nf-core/minimap2/align/main'
 include { SAMTOOLS_AMPLICONCLIP                   } from '../modules/nf-core/samtools/ampliconclip/main'
 include { SAMTOOLS_SORT                           } from '../modules/nf-core/samtools/sort/main'
-include { MOSDEPTH                                } from '../modules/nf-core/mosdepth/main'
+include { MOSDEPTH as MOSDEPTH_GENOME             } from '../modules/nf-core/mosdepth/main'
 include { BWA_INDEX                               } from '../modules/nf-core/bwa/index/main'
 include { BWA_MEM as MAP_PRIMERS                  } from '../modules/nf-core/bwa/mem/main'
 include { BWA_MEM                                 } from '../modules/nf-core/bwa/mem/main'
 include { SEQKIT_GREP                             } from '../modules/nf-core/seqkit/grep/main'
 include { BEDTOOLS_BAMTOBED                       } from '../modules/nf-core/bedtools/bamtobed/main'
+include { SAMTOOLS_FAIDX                          } from '../modules/nf-core/samtools/faidx/main'
 
 // local modules //
 include { SAMTOOLS_CONSENSUS        } from '../modules/local/samtools/consensus/main'
@@ -41,10 +46,66 @@ include { REMOVE_EMPTY_SEQUENCES    } from '../modules/local/custom/remove_empty
 include { HCV_GLUE                  } from '../modules/local/custom/hcv_glue/main'
 include { SPLIT_CONSENSUS_GENOMES   } from '../modules/local/custom/split_consensus_genomes/main'
 include { CREATE_PATTERN_FILE       } from '../modules/local/custom/create_pattern_file/main'
+include { COVERAGE_METRICS          } from '../modules/local/custom/coverage_metrics/main'
+include { BUILD_RUN_SUMMARY         } from '../modules/local/custom/build_run_summary/main'
+include { COUNT_MAPPED_READS        } from '../modules/local/custom/count_mapped_reads/main'
+include { REFERENCE_METADATA_FROM_FASTA } from '../modules/local/custom/reference_metadata_from_fasta/main'
+include { GENERATE_WHOLE_GENOME_BED } from '../modules/local/custom/generate_whole_genome_bed/main'
+include { PARSE_HCV_GLUE_COVERAGE   } from '../modules/local/custom/parse_hcv_glue_coverage/main'
+include { PLOT_HCV_SUMMARY          } from '../modules/local/custom/plot_hcv_summary/main'
+include { RENDER_HCV_REPORT         } from '../modules/local/custom/render_hcv_report/main'
 
 // local subworkflows //
 include { LONG_READ_MAPPING        } from '../subworkflows/local/long_read_mapping'
 include { SHORT_READ_MAPPING       } from '../subworkflows/local/short_read_mapping'
+
+def parseSeqkitCount(statsFile) {
+    def lines = statsFile.text.readLines().findAll { it?.trim() }
+    if (!lines) {
+        throw new IllegalStateException("Empty seqkit stats file: ${statsFile}")
+    }
+
+    def rows = lines.collect { it.split('\t', -1) as List }
+    def header = rows[0]
+    def countIdx = header.indexOf('num_seqs')
+
+    if (countIdx == -1) {
+        throw new IllegalStateException("Missing 'num_seqs' column in seqkit stats file: ${statsFile}")
+    }
+    if (rows.size() < 2) {
+        throw new IllegalStateException("Expected at least one data row in seqkit stats file: ${statsFile}")
+    }
+
+    def counts = rows.tail().collect { cols ->
+        if (cols.size() <= countIdx || !cols[countIdx].trim()) {
+            throw new IllegalStateException("Invalid seqkit stats row in ${statsFile}: ${cols.join('\t')}")
+        }
+        try {
+            cols[countIdx].trim() as Long
+        } catch (NumberFormatException e) {
+            throw new IllegalStateException("Non-numeric num_seqs value in ${statsFile}: ${cols[countIdx]}", e)
+        }
+    }
+
+    if (counts.toSet().size() > 1) {
+        throw new IllegalStateException("Inconsistent num_seqs values across seqkit stats rows in ${statsFile}: ${counts}")
+    }
+
+    return counts[0]
+}
+
+def parseMappedReadCount(countFile) {
+    def raw = countFile.text.trim()
+    if (!raw) {
+        throw new IllegalStateException("Empty mapped read count file: ${countFile}")
+    }
+
+    try {
+        return raw as Long
+    } catch (NumberFormatException e) {
+        throw new IllegalStateException("Non-numeric mapped read count in ${countFile}: ${raw}", e)
+    }
+}
 
 
 /*
@@ -53,8 +114,6 @@ include { SHORT_READ_MAPPING       } from '../subworkflows/local/short_read_mapp
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-//TODO: make sure that the 'ghost' short reads folder isn't created when running long reads only
-//TODO: update README to fully describe the pipeline, its parameters, and its installation
 workflow H2SEQ {
 
     take:
@@ -109,13 +168,55 @@ workflow H2SEQ {
 
     // TODO: add an appropriate long read QC tool before trimming
 
-    // TODO: add nanoq out to multiqc
+    SEQKIT_STATS_RAW_LONG (
+        ch_raw_long_reads
+    )
+    ch_long_raw_stats = SEQKIT_STATS_RAW_LONG.out.stats
+    ch_versions = ch_versions.mix(SEQKIT_STATS_RAW_LONG.out.versions)
+
+    ch_raw_long_counts = ch_long_raw_stats
+        .map { meta, stats ->
+            [meta.id, meta.long_reads, meta, parseSeqkitCount(stats)]
+        }
+
+    ch_raw_long_reads_ready = ch_raw_long_reads
+        .map { meta, reads ->
+            [meta.id, meta.long_reads, meta, reads]
+        }
+        .combine(ch_raw_long_counts, by: [0, 1])
+        .filter { _id, _long_reads, _meta1, _reads, _meta2, count -> count > 0 }
+        .map { _id, _long_reads, meta, reads, _meta2, _count ->
+            [meta, reads]
+        }
+
     NANOQ (
-        ch_raw_long_reads,
+        ch_raw_long_reads_ready,
         "fastq"
     )
     ch_clean_reads_long = NANOQ.out.reads
     ch_versions = ch_versions.mix(NANOQ.out.versions)
+    ch_multiqc_files = ch_multiqc_files.mix(NANOQ.out.stats.map { _meta, files -> files }.flatten())
+
+    SEQKIT_STATS_CLEAN_LONG (
+        ch_clean_reads_long
+    )
+    ch_long_clean_stats = SEQKIT_STATS_CLEAN_LONG.out.stats
+    ch_versions = ch_versions.mix(SEQKIT_STATS_CLEAN_LONG.out.versions)
+
+    ch_clean_long_counts = ch_long_clean_stats
+        .map { meta, stats ->
+            [meta.id, meta.long_reads, meta, parseSeqkitCount(stats)]
+        }
+
+    ch_clean_reads_long_ready = ch_clean_reads_long
+        .map { meta, reads ->
+            [meta.id, meta.long_reads, meta, reads]
+        }
+        .combine(ch_clean_long_counts, by: [0, 1])
+        .filter { _id, _long_reads, _meta1, _reads, _meta2, count -> count > 0 }
+        .map { _id, _long_reads, meta, reads, _meta2, _count ->
+            [meta, reads]
+        }
 
     // TODO: add an appropriate long read QC tool after trimming
 
@@ -125,14 +226,35 @@ workflow H2SEQ {
     ================================================================================
     */
 
-    FASTQC_RAW_SHORT (
+    SEQKIT_STATS_RAW_SHORT (
         ch_raw_short_reads
+    )
+    ch_short_raw_stats = SEQKIT_STATS_RAW_SHORT.out.stats
+    ch_versions = ch_versions.mix(SEQKIT_STATS_RAW_SHORT.out.versions)
+
+    ch_raw_short_counts = ch_short_raw_stats
+        .map { meta, stats ->
+            [meta.id, meta.long_reads, meta, parseSeqkitCount(stats)]
+        }
+
+    ch_raw_short_reads_ready = ch_raw_short_reads
+        .map { meta, reads ->
+            [meta.id, meta.long_reads, meta, reads]
+        }
+        .combine(ch_raw_short_counts, by: [0, 1])
+        .filter { _id, _long_reads, _meta1, _reads, _meta2, count -> count > 0 }
+        .map { _id, _long_reads, meta, reads, _meta2, _count ->
+            [meta, reads]
+        }
+
+    FASTQC_RAW_SHORT (
+        ch_raw_short_reads_ready
     )
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC_RAW_SHORT.out.zip.collect{it[1]})
     ch_versions = ch_versions.mix(FASTQC_RAW_SHORT.out.versions.first())
 
     FASTP (
-        ch_raw_short_reads,
+        ch_raw_short_reads_ready,
         ch_fastp_adapter_path,
         false,
         false
@@ -140,9 +262,31 @@ workflow H2SEQ {
 
     ch_clean_reads_short = FASTP.out.reads
     ch_versions = ch_versions.mix(FASTP.out.versions.first())
+    ch_multiqc_files = ch_multiqc_files.mix(FASTP.out.json.collect { it[1] })
+
+    SEQKIT_STATS_CLEAN_SHORT (
+        ch_clean_reads_short
+    )
+    ch_short_clean_stats = SEQKIT_STATS_CLEAN_SHORT.out.stats
+    ch_versions = ch_versions.mix(SEQKIT_STATS_CLEAN_SHORT.out.versions)
+
+    ch_clean_short_counts = ch_short_clean_stats
+        .map { meta, stats ->
+            [meta.id, meta.long_reads, meta, parseSeqkitCount(stats)]
+        }
+
+    ch_clean_reads_short_ready = ch_clean_reads_short
+        .map { meta, reads ->
+            [meta.id, meta.long_reads, meta, reads]
+        }
+        .combine(ch_clean_short_counts, by: [0, 1])
+        .filter { _id, _long_reads, _meta1, _reads, _meta2, count -> count > 0 }
+        .map { _id, _long_reads, meta, reads, _meta2, _count ->
+            [meta, reads]
+        }
 
     FASTQC_TRIMMED_SHORT (
-        ch_clean_reads_short
+        ch_clean_reads_short_ready
     )
     ch_multiqc_files = ch_multiqc_files.mix(FASTQC_TRIMMED_SHORT.out.zip.collect{it[1]})
     ch_versions = ch_versions.mix(FASTQC_TRIMMED_SHORT.out.versions.first())
@@ -154,7 +298,13 @@ workflow H2SEQ {
     ================================================================================
     */
 
-    ch_clean_reads_combined = ch_clean_reads_short.mix(ch_clean_reads_long)
+    ch_clean_reads_combined = ch_clean_reads_short_ready.mix(ch_clean_reads_long_ready)
+    ch_long_sample_ids = ch_clean_reads_long_ready
+        .map { meta, _reads -> [meta.id] }
+        .unique()
+    ch_short_sample_ids = ch_clean_reads_short_ready
+        .map { meta, _reads -> [meta.id] }
+        .unique()
 
     if (!params.skip_reference_selection){
         if (params.reference_selection_tool == "kallisto") {
@@ -180,7 +330,7 @@ workflow H2SEQ {
             ch_versions = ch_versions.mix(KALLISTO_QUANT.out.versions)
         } else if (params.reference_selection_tool == "salmon") {
             // Focus on (potential) long reads first
-            ch_map_for_salmon_long = ch_clean_reads_long
+            ch_map_for_salmon_long = ch_clean_reads_long_ready
                 .combine(ch_reference_fasta)
 
             MINIMAP2_ALIGN_SALMON (
@@ -218,7 +368,7 @@ workflow H2SEQ {
             ch_versions = ch_versions.mix(SALMON_INDEX.out.versions)
             ch_salmon_idx = SALMON_INDEX.out.index.first()
 
-            ch_input_for_salmon_short = ch_clean_reads_short
+            ch_input_for_salmon_short = ch_clean_reads_short_ready
                 .combine(ch_ref_for_salmon)
 
             SALMON_QUANT_SHORT (
@@ -240,7 +390,6 @@ workflow H2SEQ {
         )
 
         ch_best_ref_tsv = SELECT_BEST_REFERENCE.out.best_ref_tsv
-        // TODO: GET THE BEST REF TXT EVEN WHEN SKIPPING REFERENCE SELECTION
         ch_best_ref_txt = SELECT_BEST_REFERENCE.out.best_ref_txt
         ch_alt_ref_txt = SELECT_BEST_REFERENCE.out.alt_ref_txt
         ch_versions = ch_versions.mix(SELECT_BEST_REFERENCE.out.versions)
@@ -260,35 +409,41 @@ workflow H2SEQ {
             }
 
         ch_best_ref_long = ch_best_ref_fasta
-            .filter { _id, meta, _fasta -> meta.long_reads == true }
+            .combine(ch_long_sample_ids, by: 0)
+            .map { sample_id, meta, fasta ->
+                [sample_id, meta, fasta]
+            }
 
         ch_best_ref_short = ch_best_ref_fasta
-            .filter { _id, meta, _fasta -> meta.long_reads == false }
+            .combine(ch_short_sample_ids, by: 0)
+            .map { sample_id, meta, fasta ->
+                [sample_id, meta, fasta]
+            }
     } else {
         // When skipping reference selection, we need to create reference channels
         // for each sample with the proper structure [sample_id, meta, fasta]
-        // First, get all unique sample IDs from the reads
-        ch_sample_ids = ch_clean_reads_long.mix(ch_clean_reads_short)
-            .map { meta, reads -> meta.id }
-            .unique()
-
         // Create reference channels by combining sample IDs with the reference fasta
         // Structure: [sample_id, ref_meta, fasta]
-        ch_best_ref_long = ch_sample_ids
+        ch_best_ref_long = ch_long_sample_ids
             .combine(ch_reference_fasta)
             .map { sample_id, ref_id, ref_meta, fasta ->
-                def new_meta = ref_meta + [long_reads: true]
+                def new_meta = ref_meta + [id: sample_id, long_reads: true]
                 return [sample_id, new_meta, fasta]
             }
 
-        ch_best_ref_short = ch_sample_ids
+        ch_best_ref_short = ch_short_sample_ids
             .combine(ch_reference_fasta)
             .map { sample_id, ref_id, ref_meta, fasta ->
-                def new_meta = ref_meta + [long_reads: false]
+                def new_meta = ref_meta + [id: sample_id, long_reads: false]
                 return [sample_id, new_meta, fasta]
             }
-        // ch_best_ref_short.view()
-        // ch_best_ref_long.view()
+
+        REFERENCE_METADATA_FROM_FASTA (
+            ch_best_ref_long.mix(ch_best_ref_short)
+        )
+        ch_best_ref_tsv = REFERENCE_METADATA_FROM_FASTA.out.best_ref_tsv
+        ch_best_ref_txt = REFERENCE_METADATA_FROM_FASTA.out.best_ref_txt
+        ch_versions = ch_versions.mix(REFERENCE_METADATA_FROM_FASTA.out.versions)
     }
 
     /*
@@ -302,15 +457,116 @@ workflow H2SEQ {
     // Note: here we have separate subworkflows for short and long reads
     //       Might have been able to avoid this with careful multi-key combines (see Consensus section below),
     //       but for sustained development this seemed like a better choice.
-    LONG_READ_MAPPING  ( ch_best_ref_long, ch_clean_reads_long )
-    SHORT_READ_MAPPING ( ch_best_ref_short, ch_clean_reads_short )
+    LONG_READ_MAPPING  ( ch_best_ref_long, ch_clean_reads_long_ready )
+    SHORT_READ_MAPPING ( ch_best_ref_short, ch_clean_reads_short_ready )
 
     ch_versions = ch_versions.mix(LONG_READ_MAPPING.out.versions)
     ch_versions = ch_versions.mix(SHORT_READ_MAPPING.out.versions)
 
     ch_consensus_bam_long = LONG_READ_MAPPING.out.consensus_bam
     ch_consensus_bam_short = SHORT_READ_MAPPING.out.consensus_bam
+    ch_consensus_bam_idx_long = LONG_READ_MAPPING.out.consensus_bam_idx
+    ch_consensus_bam_idx_short = SHORT_READ_MAPPING.out.consensus_bam_idx
+    ch_amplicon_bed_long = LONG_READ_MAPPING.out.amplicon_bed
+    ch_amplicon_bed_short = SHORT_READ_MAPPING.out.amplicon_bed
     ch_consensus_bam = ch_consensus_bam_long.mix(ch_consensus_bam_short)
+    ch_consensus_bam_idx = ch_consensus_bam_idx_long.mix(ch_consensus_bam_idx_short)
+    ch_amplicon_bed = ch_amplicon_bed_long.mix(ch_amplicon_bed_short)
+
+    COUNT_MAPPED_READS (
+        ch_consensus_bam
+    )
+    ch_versions = ch_versions.mix(COUNT_MAPPED_READS.out.versions)
+
+    ch_mapped_read_counts = COUNT_MAPPED_READS.out.txt
+        .map { meta, countTxt ->
+            def count = parseMappedReadCount(countTxt)
+            [meta.id, meta.long_reads, meta, count]
+        }
+
+    ch_consensus_bam_ready = ch_consensus_bam
+        .map { meta, bam ->
+            [meta.id, meta.long_reads, meta, bam]
+        }
+        .combine(ch_mapped_read_counts, by: [0, 1])
+        .filter { _id, _long_reads, _meta1, _bam, _meta2, count -> count > 0 }
+        .map { _id, _long_reads, meta, bam, _meta2, _count ->
+            [meta, bam]
+        }
+
+    ch_best_ref_all = ch_best_ref_long.mix(ch_best_ref_short)
+
+    SAMTOOLS_FAIDX (
+        ch_best_ref_all
+            .map { _id, meta, fasta ->
+                [meta, fasta]
+            }
+    )
+    ch_versions = ch_versions.mix(SAMTOOLS_FAIDX.out.versions)
+
+    ch_reference_fai = SAMTOOLS_FAIDX.out.fa_and_idx
+        .map { meta, fasta, fai ->
+            [meta.id, meta.long_reads, meta + [reference_name: fai.text.readLines()[0].split('\t')[0]], fasta, fai]
+        }
+
+    GENERATE_WHOLE_GENOME_BED (
+        ch_reference_fai.map { _id, _long_reads, meta, _fasta, fai ->
+            [meta, fai]
+        }
+    )
+    ch_versions = ch_versions.mix(GENERATE_WHOLE_GENOME_BED.out.versions)
+
+    ch_mosdepth_input = ch_consensus_bam
+        .map { meta, bam ->
+            [meta.id, meta.long_reads, meta, bam]
+        }
+        .combine(
+            ch_consensus_bam_idx.map { meta, idx ->
+                [meta.id, meta.long_reads, meta, idx]
+            },
+            by: [0, 1]
+        )
+        .combine(
+            GENERATE_WHOLE_GENOME_BED.out.bed.map { meta, bed ->
+                [meta.id, meta.long_reads, meta, bed]
+            },
+            by: [0, 1]
+        )
+        .map { _id, _long_reads, meta, bam, _meta2, idx, _meta3, bed ->
+            [meta, bam, idx, bed]
+        }
+
+    ch_mosdepth_reference = ch_reference_fai
+        .map { _id, _long_reads, meta, fasta, _fai ->
+            [meta, fasta]
+        }
+
+    MOSDEPTH_GENOME (
+        ch_mosdepth_input,
+        ch_mosdepth_reference
+    )
+    ch_versions = ch_versions.mix(MOSDEPTH_GENOME.out.versions)
+    ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH_GENOME.out.summary_txt.collect { it[1] })
+    ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH_GENOME.out.global_txt.collect { it[1] })
+
+    ch_coverage_input = MOSDEPTH_GENOME.out.regions_bed
+        .map { meta, genome_bed_gz ->
+            [meta.id, meta.long_reads, meta, genome_bed_gz]
+        }
+        .combine(
+            MOSDEPTH_GENOME.out.per_base_bed.map { meta, per_base_bed_gz ->
+                [meta.id, meta.long_reads, meta, per_base_bed_gz]
+            },
+            by: [0, 1]
+        )
+        .map { _id, _long_reads, meta, genome_bed_gz, _meta2, per_base_bed_gz ->
+            [meta, genome_bed_gz, per_base_bed_gz]
+        }
+
+    COVERAGE_METRICS (
+        ch_coverage_input
+    )
+    ch_versions = ch_versions.mix(COVERAGE_METRICS.out.versions)
 
     /*
     ================================================================================
@@ -319,7 +575,7 @@ workflow H2SEQ {
     */
 
     SAMTOOLS_CONSENSUS (
-        ch_consensus_bam
+        ch_consensus_bam_ready
     )
 
     ch_consensus_fa = SAMTOOLS_CONSENSUS.out.fasta
@@ -405,7 +661,105 @@ workflow H2SEQ {
         HCV_GLUE (
             ch_glue_fa
         )
+
+        ch_hcv_reports = HCV_GLUE.out.report
+    } else {
+        ch_hcv_reports = Channel.empty()
     }
+
+    ch_hcv_main_reports = ch_hcv_reports
+        .filter { _meta, html -> html.name.contains("consensus_main") }
+
+    if (params.virus_preset == "hcv" && params.run_hcv_glue) {
+        PARSE_HCV_GLUE_COVERAGE (
+            ch_hcv_main_reports
+        )
+        ch_versions = ch_versions.mix(PARSE_HCV_GLUE_COVERAGE.out.versions)
+
+        ch_hcv_plot_input = MOSDEPTH_GENOME.out.per_base_bed
+            .map { meta, per_base_bed_gz ->
+                [meta.id, meta.long_reads, meta, per_base_bed_gz]
+            }
+            .combine(
+                COVERAGE_METRICS.out.summary.map { meta, summary ->
+                    [meta.id, meta.long_reads, meta, summary]
+                },
+                by: [0, 1]
+            )
+            .combine(
+                PARSE_HCV_GLUE_COVERAGE.out.tsv.map { meta, tsv ->
+                    [meta.id, meta.long_reads, meta, tsv]
+                },
+                by: [0, 1]
+            )
+            .map { _id, _long_reads, meta, per_base_bed_gz, _meta2, summary, _meta3, hcv_tsv ->
+                [meta, per_base_bed_gz, summary, hcv_tsv]
+            }
+
+        PLOT_HCV_SUMMARY (
+            ch_hcv_plot_input
+        )
+        ch_versions = ch_versions.mix(PLOT_HCV_SUMMARY.out.versions)
+
+        ch_hcv_report_input = ch_best_ref_tsv
+            .map { meta, best_ref_tsv ->
+                [meta.id, meta.long_reads, meta, best_ref_tsv]
+            }
+            .combine(
+                COVERAGE_METRICS.out.summary.map { meta, summary ->
+                    [meta.id, meta.long_reads, meta, summary]
+                },
+                by: [0, 1]
+            )
+            .combine(
+                PLOT_HCV_SUMMARY.out.depth.map { meta, depth_plot ->
+                    [meta.id, meta.long_reads, meta, depth_plot]
+                },
+                by: [0, 1]
+            )
+            .combine(
+                PLOT_HCV_SUMMARY.out.feature.map { meta, feature_plot ->
+                    [meta.id, meta.long_reads, meta, feature_plot]
+                },
+                by: [0, 1]
+            )
+            .map { _id, _long_reads, meta, best_ref_tsv, _meta2, summary, _meta3, depth_plot, _meta4, feature_plot ->
+                [meta, best_ref_tsv, summary, depth_plot, feature_plot]
+            }
+
+        RENDER_HCV_REPORT (
+            ch_hcv_report_input,
+            file("${projectDir}/assets/h2seq_logo.png"),
+            workflow.manifest.version ?: ""
+        )
+        ch_versions = ch_versions.mix(RENDER_HCV_REPORT.out.versions)
+    }
+
+    ch_summary_triggers = COVERAGE_METRICS.out.summary
+        .mix(ch_split_consensuses)
+        .mix(ch_hcv_reports)
+        .mix(NANOQ.out.stats)
+        .mix(FASTP.out.json)
+        .mix(ch_long_raw_stats)
+        .mix(ch_long_clean_stats)
+        .mix(ch_short_raw_stats)
+        .mix(ch_short_clean_stats)
+        .mix(COUNT_MAPPED_READS.out.txt)
+
+    ch_summary_triggers = ch_summary_triggers.mix(ch_best_ref_tsv)
+    if (params.virus_preset == "hcv" && params.run_hcv_glue) {
+        ch_summary_triggers = ch_summary_triggers
+            .mix(PARSE_HCV_GLUE_COVERAGE.out.tsv)
+            .mix(PLOT_HCV_SUMMARY.out.depth)
+            .mix(PLOT_HCV_SUMMARY.out.feature)
+            .mix(RENDER_HCV_REPORT.out.pdf)
+    }
+
+    BUILD_RUN_SUMMARY (
+        ch_summary_triggers.collect(),
+        file(params.outdir).toString(),
+        workflow.manifest.version ?: ""
+    )
 
     /*
     ================================================================================
@@ -446,6 +800,11 @@ workflow H2SEQ {
     ch_methods_description                = Channel.value(
         methodsDescriptionText(ch_multiqc_custom_methods_description))
 
+    ch_multiqc_files = ch_multiqc_files.mix(ch_long_raw_stats.collect { it[1] })
+    ch_multiqc_files = ch_multiqc_files.mix(ch_long_clean_stats.collect { it[1] })
+    ch_multiqc_files = ch_multiqc_files.mix(ch_short_raw_stats.collect { it[1] })
+    ch_multiqc_files = ch_multiqc_files.mix(ch_short_clean_stats.collect { it[1] })
+    ch_multiqc_files = ch_multiqc_files.mix(BUILD_RUN_SUMMARY.out.mqc)
     ch_multiqc_files = ch_multiqc_files.mix(
         ch_workflow_summary.collectFile(name: 'workflow_summary_mqc.yaml'))
     ch_multiqc_files = ch_multiqc_files.mix(ch_collated_versions)
@@ -466,6 +825,7 @@ workflow H2SEQ {
     emit:
     multiqc_report = MULTIQC.out.report.toList() // channel: /path/to/multiqc_report.html
     versions       = ch_versions                 // channel: [ path(versions.yml) ]
+    run_summary    = BUILD_RUN_SUMMARY.out.csv
 }
 
 /*

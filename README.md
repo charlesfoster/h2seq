@@ -10,7 +10,7 @@
 
 ## Introduction
 
-**charlesfoster/h2seq** is a bioinformatics pipeline that has been designed to analyse molecular sequencing data of viruses for the H2Seq study. Accordingly, it has been designed with HCV and HIV in mind, but in theory should work with any (most?) viruses. The workflow will handle data from both long-read (ONT) and/or short-read (Illumina) (to be added) sequencing platforms, and can handle tiled amplicon sequencing and/or shotgun/metagenomic/capture probe sequencing.
+**charlesfoster/h2seq** is a bioinformatics pipeline that has been designed to analyse molecular sequencing data of viruses for the H2Seq study. Accordingly, it has been designed with HCV and HIV in mind, but in theory should work with any (most?) viruses. The workflow handles both long-read (ONT) and short-read (Illumina) sequencing data, and can handle tiled amplicon sequencing and/or shotgun/metagenomic/capture probe sequencing.
 
 ### Quality Control
 
@@ -41,18 +41,23 @@ Currently there are no 'specialised' modules for metagenomics data. Just run the
 
 **HCV-GLUE**
 
-Given the initial focus of this pipeline for the H2Seq study, a module has been included to run the excellent ([`HCV-GLUE`](https://github.com/giffordlabcvr/HCV-GLUE)) tool. While the tool can do _a lot_, in this case the use is for generating reports based on HCV consensus genomes. The usage of `HCV-GLUE`, by design, needs SQL-like syntax and relies on a Docker daemon running in the background. While it makes sense for 'vanilla' usage of `HCV-GLUE`, unfortunately it does not make its incorporation into a pipeline strictly following the `nf-core` framework straightforward. Therefore, unlike all other modules in the pipeline, in which tools are automatically sourced from containers/conda, successful use of `HCV-GLUE` requires manual installation of it and its dependencies. Please see the ([installation instructions](http://hcv-glue.cvr.gla.ac.uk/#/aboutGlueProject)) for `HCV-GLUE` if you wish to run this module.
+Given the initial focus of this pipeline for the H2Seq study, a module has been included to run the excellent ([`HCV-GLUE`](https://github.com/giffordlabcvr/HCV-GLUE)) tool. While the tool can do _a lot_, in this case the use is for generating reports based on HCV consensus genomes. `HCV-GLUE` is an intentionally non-standard optional step in this pipeline because the upstream Docker installation model relies on a persistent MySQL-backed GLUE setup, rather than a single self-contained command line tool invocation. Accordingly, unlike the other modules in the pipeline, successful use of `HCV-GLUE` requires manual installation and preparation outside the normal nf-core container/conda flow.
+
+If you use `--run_hcv_glue`, you should assume the following prerequisites:
+
+- Docker must be available on the host running the task.
+- A `gluetools-mysql` container must already be running.
+- The HCV GLUE project/database must already be installed in that container.
+- This optional step is therefore less portable than the rest of the pipeline and is best treated as a site-specific integration.
+
+Please see the upstream Docker installation instructions for `HCV-GLUE`: <https://github.com/giffordlabcvr/HCV-GLUE/wiki/Docker-Installation>
 
 ### Future considerations:
 
-- _variant calling to produce a VCF file instead of/in addition to direct consensus generation_ (currently available with long reads only)
 - _estimation of the amino acid consequences of SNPs/indels to aid with drug resistance analysis_ (currently only provided via the integrated HCV Glue workflow)
 - _placement of input samples into a phylogenetic tree_
 - _host filtration_
 - _use `pycoQC` for Nanopore QC instead of fastQC_
-
-<!-- TODO nf-core: Include a figure that guides the user through the major workflow steps. Many nf-core
-     workflows use the "tube map" design for that. See https://nf-co.re/docs/contributing/design_guidelines#examples for examples.   -->
 
 ## Usage
 
@@ -87,6 +92,9 @@ nextflow run charlesfoster/h2seq \
 > [!IMPORTANT]
 > Development has focused on dependencies being handled by Docker or Apptainer, i.e. by including `-profile docker` or `-profile apptainer`. Currently `-profile conda` will _NOT_ work, but will work in the future.
 
+> [!NOTE]
+> The optional `--run_hcv_glue` step is an exception to the usual dependency model described above. It shells out to Docker directly and expects a pre-existing GLUE database/container setup as described in the `HCV-GLUE` section.
+
 Available parameters to be configured can be viewed by running:
 
 ```bash
@@ -97,28 +105,19 @@ nextflow run charlesfoster/h2seq --help
 > Please provide pipeline parameters via the CLI or Nextflow `-params-file` option. Custom config files including those provided by the `-c` Nextflow option can be used to provide any configuration _**except for parameters**_;
 > see [docs](https://nf-co.re/usage/configuration#custom-configuration-files).
 
-For more details and further functionality, please refer to the [usage documentation](https://nf-co.re/mag/usage).
+For more details and further functionality, please refer to the local documentation in [docs/usage.md](docs/usage.md) and [docs/output.md](docs/output.md).
 
 ## Credits
 
 charlesfoster/h2seq was originally written by Charles Foster.
 
-We thank the following people for their extensive assistance in the development of this pipeline:
-
-- No one else yet!
-
-<!-- TODO nf-core: If applicable, make list of people who have also contributed -->
+We thank the nf-core community for the reusable workflow structure and module ecosystem that this pipeline builds on.
 
 ## Contributions and Support
 
 If you would like to contribute to this pipeline, please see the [contributing guidelines](.github/CONTRIBUTING.md).
 
 ## Citations
-
-<!-- TODO nf-core: Add citation for pipeline after first release. Uncomment lines below and update Zenodo doi and badge at the top of this file. -->
-<!-- If you use charlesfoster/h2seq for your analysis, please cite it using the following doi: [10.5281/zenodo.XXXXXX](https://doi.org/10.5281/zenodo.XXXXXX) -->
-
-<!-- TODO nf-core: Add bibliography of tools and data used in your pipeline -->
 
 An extensive list of references for the tools used by the pipeline can be found in the [`CITATIONS.md`](CITATIONS.md) file.
 
