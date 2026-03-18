@@ -130,7 +130,7 @@ def main():
     ax_footer = fig.add_subplot(gs[footer_rows, 0:12])
     ax_footer.axis("off")
     ax_footer.text(0.0, 0.98, "Brief Description", fontsize=11, fontweight="bold", ha="left", va="top")
-    ax_footer.text(0.0, 0.86, textwrap.fill(summary_sentence, width=120), fontsize=9, ha="left", va="top")
+    ax_footer.text(0.0, 0.86, textwrap.fill(summary_sentence, width=95), fontsize=8.5, ha="left", va="top")
 
     fig.savefig(args.output, format="pdf")
     plt.close(fig)

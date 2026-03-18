@@ -64,6 +64,7 @@ include { PARSE_HCV_GLUE_COVERAGE   } from '../modules/local/custom/parse_hcv_gl
 include { PLOT_HCV_SUMMARY          } from '../modules/local/custom/plot_hcv_summary/main'
 include { PLOT_DEPTH_SUMMARY        } from '../modules/local/custom/plot_depth_summary/main'
 include { RENDER_HCV_REPORT         } from '../modules/local/custom/render_hcv_report/main'
+include { RENDER_SUMMARY_REPORT     } from '../modules/local/custom/render_summary_report/main'
 
 // local subworkflows //
 include { LONG_READ_MAPPING        } from '../subworkflows/local/long_read_mapping'
@@ -826,14 +827,7 @@ workflow H2SEQ {
         ch_versions = ch_versions.mix(PLOT_HCV_SUMMARY.out.versions)
     }
 
-    ch_feature_plot_lookup = (params.virus_preset == "hcv" && params.run_hcv_glue) ?
-        PLOT_HCV_SUMMARY.out.feature
-            .map { meta, feature_plot -> ["${meta.id}::${meta.long_reads}", feature_plot] }
-            .collect()
-            .map { entries -> entries.collectEntries { [(it[0]): it[1]] } } :
-        Channel.value([:])
-
-    ch_report_input = ch_best_ref_tsv
+    ch_report_base = ch_best_ref_tsv
         .map { meta, best_ref_tsv ->
             [meta.id, meta.long_reads, meta, best_ref_tsv]
         }
@@ -849,23 +843,75 @@ workflow H2SEQ {
             },
             by: [0, 1]
         )
-        .combine(ch_feature_plot_lookup)
-        .map { _id, _long_reads, meta, best_ref_tsv, _meta2, summary, _meta3, depth_plot, feature_plot_lookup ->
-            def key = "${meta.id}::${meta.long_reads}"
-            def featurePlot = feature_plot_lookup[key]
-            def includeFeaturePlot = featurePlot != null
-            if (!includeFeaturePlot) {
-                featurePlot = file("${projectDir}/assets/no_feature_plot.placeholder.txt")
-            }
-            [meta, best_ref_tsv, summary, depth_plot, includeFeaturePlot, featurePlot]
+        .map { _id, _long_reads, meta, best_ref_tsv, _meta2, summary, _meta3, depth_plot ->
+            [meta.id, meta.long_reads, meta, best_ref_tsv, summary, depth_plot]
         }
 
-    RENDER_HCV_REPORT (
-        ch_report_input,
-        file("${projectDir}/assets/h2seq_logo.png"),
-        workflow.manifest.version ?: ""
-    )
-    ch_versions = ch_versions.mix(RENDER_HCV_REPORT.out.versions)
+    if (params.virus_preset == "hcv" && params.run_hcv_glue) {
+        ch_report_grouped = ch_report_base
+            .map { id, long_reads, meta, best_ref_tsv, summary, depth_plot ->
+                [[id, long_reads], [meta, best_ref_tsv, summary, depth_plot], null]
+            }
+            .mix(
+                PLOT_HCV_SUMMARY.out.feature.map { meta, feature_plot ->
+                    [[meta.id, meta.long_reads], null, feature_plot]
+                }
+            )
+            .groupTuple()
+
+        ch_report_input_with_feature = ch_report_grouped
+            .map { _key, payloads, feature_plots ->
+                def payload = payloads.find { it != null }
+                def featurePlot = feature_plots.find { it != null }
+                [payload, featurePlot]
+            }
+            .filter { payload, featurePlot -> payload != null && featurePlot != null }
+            .map { payload, featurePlot ->
+                def (meta, best_ref_tsv, summary, depth_plot) = payload
+                [meta, best_ref_tsv, summary, depth_plot, featurePlot]
+            }
+
+        ch_report_input_without_feature = ch_report_grouped
+            .map { _key, payloads, feature_plots ->
+                def payload = payloads.find { it != null }
+                def featurePlot = feature_plots.find { it != null }
+                [payload, featurePlot]
+            }
+            .filter { payload, featurePlot -> payload != null && featurePlot == null }
+            .map { payload, _featurePlot ->
+                def (meta, best_ref_tsv, summary, depth_plot) = payload
+                [meta, best_ref_tsv, summary, depth_plot]
+            }
+
+        RENDER_HCV_REPORT (
+            ch_report_input_with_feature,
+            file("${projectDir}/assets/h2seq_logo.png"),
+            workflow.manifest.version ?: ""
+        )
+
+        RENDER_SUMMARY_REPORT (
+            ch_report_input_without_feature,
+            file("${projectDir}/assets/h2seq_logo.png"),
+            workflow.manifest.version ?: ""
+        )
+
+        ch_versions = ch_versions
+            .mix(RENDER_HCV_REPORT.out.versions)
+            .mix(RENDER_SUMMARY_REPORT.out.versions)
+    } else {
+        ch_report_input_without_feature = ch_report_base
+            .map { _id, _long_reads, meta, best_ref_tsv, summary, depth_plot ->
+                [meta, best_ref_tsv, summary, depth_plot]
+            }
+
+        RENDER_SUMMARY_REPORT (
+            ch_report_input_without_feature,
+            file("${projectDir}/assets/h2seq_logo.png"),
+            workflow.manifest.version ?: ""
+        )
+
+        ch_versions = ch_versions.mix(RENDER_SUMMARY_REPORT.out.versions)
+    }
 
     ch_summary_triggers = COVERAGE_METRICS.out.summary
         .mix(ch_split_consensuses)
@@ -881,11 +927,12 @@ workflow H2SEQ {
     ch_summary_triggers = ch_summary_triggers.mix(ch_best_ref_tsv)
     ch_summary_triggers = ch_summary_triggers
         .mix(PLOT_DEPTH_SUMMARY.out.depth)
-        .mix(RENDER_HCV_REPORT.out.pdf)
+        .mix(RENDER_SUMMARY_REPORT.out.pdf)
     if (params.virus_preset == "hcv" && params.run_hcv_glue) {
         ch_summary_triggers = ch_summary_triggers
             .mix(PARSE_HCV_GLUE_COVERAGE.out.tsv)
             .mix(PLOT_HCV_SUMMARY.out.feature)
+            .mix(RENDER_HCV_REPORT.out.pdf)
     }
 
     BUILD_RUN_SUMMARY (

@@ -1,4 +1,4 @@
-process RENDER_HCV_REPORT {
+process RENDER_SUMMARY_REPORT {
     tag "$meta.id"
     label 'process_low'
 
@@ -8,7 +8,7 @@ process RENDER_HCV_REPORT {
         'quay.io/biocontainers/longqc:1.2.0c--hdfd78af_0' }"
 
     input:
-    tuple val(meta), path(best_reference_tsv), path(coverage_summary), path(depth_plot), path(feature_plot)
+    tuple val(meta), path(best_reference_tsv), path(coverage_summary), path(depth_plot)
     path logo
     val pipeline_version
 
@@ -32,8 +32,6 @@ process RENDER_HCV_REPORT {
         --best-reference-tsv ${best_reference_tsv} \\
         --coverage-summary ${coverage_summary} \\
         --depth-plot ${depth_plot} \\
-        --feature-plot ${feature_plot} \\
-        --include-feature-plot \\
         --logo ${logo} \\
         --pipeline-version "${pipeline_version}" \\
         --reference-selection-tool "${params.reference_selection_tool}" \\
