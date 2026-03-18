@@ -13,7 +13,7 @@ process BUILD_MULTIQC_SECTIONS {
 
     output:
     path "coverage_statistics_mqc.json", emit: coverage
-    path "region_coverage_mqc.png", emit: region_coverage
+    path "region_coverage_mqc.json", emit: region_coverage
     path "coverage_per_genomic_region.pdf", emit: region_coverage_pdf
     path "read_statistics_mqc.json", emit: read_stats
     path "variant_calling_mqc.json", emit: variants
@@ -29,7 +29,7 @@ process BUILD_MULTIQC_SECTIONS {
     python3 ${projectDir}/bin/build_multiqc_sections.py \\
         --outdir "${outdir}" \\
         --coverage-output coverage_statistics_mqc.json \\
-        --region-coverage-output region_coverage_mqc.png \\
+        --region-coverage-output region_coverage_mqc.json \\
         --region-coverage-pdf-output coverage_per_genomic_region.pdf \\
         --read-output read_statistics_mqc.json \\
         --variant-output variant_calling_mqc.json
@@ -41,7 +41,7 @@ process BUILD_MULTIQC_SECTIONS {
     python3 - <<-'PY'
     import base64
     png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9pM8S2QAAAAASUVORK5CYII=")
-    open("region_coverage_mqc.png", "wb").write(png)
+    open("region_coverage_mqc.json", "w").write("{}")
     open("coverage_per_genomic_region.pdf", "wb").write(b"%PDF-1.1\\n%%EOF\\n")
     PY
     echo '{}' > read_statistics_mqc.json

@@ -323,6 +323,41 @@ def build_variant_section(outdir):
 def build_region_coverage_rows(outdir):
     rows = {}
 
+    combined_summary = outdir / "combined_results_summary.csv"
+    if combined_summary.exists():
+        with open(combined_summary, newline="") as handle:
+            for record in csv.DictReader(handle):
+                sample_id = record.get("sample_id", "")
+                read_type = record.get("read_type", "")
+                if not sample_id or not read_type:
+                    continue
+                key = (sample_id, read_type)
+                rows.setdefault(
+                    key,
+                    {
+                        "sample_id": sample_id,
+                        "read_type": read_type,
+                        **{feature: 0.0 for feature in HCV_FEATURES},
+                    },
+                )
+
+    if not rows:
+        for path in sorted(outdir.rglob("*.coverage_summary.tsv")):
+            for record in load_tsv_rows(path):
+                sample_id = record.get("sample_id", "")
+                read_type = record.get("read_type", "")
+                if not sample_id or not read_type:
+                    continue
+                key = (sample_id, read_type)
+                rows.setdefault(
+                    key,
+                    {
+                        "sample_id": sample_id,
+                        "read_type": read_type,
+                        **{feature: 0.0 for feature in HCV_FEATURES},
+                    },
+                )
+
     for path in sorted(outdir.rglob("*.hcv_glue_coverage.tsv")):
         for record in load_tsv_rows(path):
             sample_id = record.get("sample_id", "")
@@ -331,10 +366,50 @@ def build_region_coverage_rows(outdir):
             if feature not in HCV_FEATURES:
                 continue
             key = (sample_id, read_type)
-            rows.setdefault(key, {"sample_id": sample_id, "read_type": read_type})
-            rows[key][feature] = to_float(record.get("coverage_pct"), None)
+            rows.setdefault(
+                key,
+                {
+                    "sample_id": sample_id,
+                    "read_type": read_type,
+                    **{feature_name: 0.0 for feature_name in HCV_FEATURES},
+                },
+            )
+            rows[key][feature] = to_float(record.get("coverage_pct"), 0.0)
 
     return rows
+
+
+def build_region_coverage_section(outdir):
+    rows = build_region_coverage_rows(outdir)
+
+    if not rows:
+        return {}
+
+    ordered_rows = [rows[key] for key in sorted(rows)]
+    sample_labels = [row_label(row["sample_id"], row["read_type"]) for row in ordered_rows]
+    matrix = [[row.get(feature, 0.0) for feature in HCV_FEATURES] for row in ordered_rows]
+
+    return {
+        "id": "h2seq_region_coverage",
+        "section_name": "Coverage Per Genomic Region",
+        "description": "HCV gene and polyprotein coverage percentages parsed from HCV-GLUE reports.",
+        "plot_type": "heatmap",
+        "pconfig": {
+            "id": "h2seq_region_coverage_heatmap",
+            "title": "Coverage Per Genomic Region",
+            "xlab": "Genomic region",
+            "ylab": "Sample",
+            "zlab": "Coverage (%)",
+            "min": 0,
+            "max": 100,
+            "xcats_samples": False,
+            "ycats_samples": True,
+        },
+        "data": matrix,
+        "xcats": HCV_FEATURES,
+        "ycats": sample_labels,
+    }
+
 
 def write_region_coverage_heatmap(path, outdir):
     rows = build_region_coverage_rows(outdir)
@@ -384,7 +459,7 @@ def main():
     args = parse_args()
     outdir = Path(args.outdir)
     write_json(args.coverage_output, build_coverage_section(outdir))
-    write_region_coverage_heatmap(args.region_coverage_output, outdir)
+    write_json(args.region_coverage_output, build_region_coverage_section(outdir))
     write_region_coverage_heatmap(args.region_coverage_pdf_output, outdir)
     write_json(args.read_output, build_read_section(outdir))
     write_json(args.variant_output, build_variant_section(outdir))

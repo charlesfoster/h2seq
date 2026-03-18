@@ -8,7 +8,7 @@ process RENDER_HCV_REPORT {
         'quay.io/biocontainers/longqc:1.2.0c--hdfd78af_0' }"
 
     input:
-    tuple val(meta), path(best_reference_tsv), path(coverage_summary), path(depth_plot), path(feature_plot)
+    tuple val(meta), path(best_reference_tsv), path(coverage_summary), path(depth_plot), val(include_feature_plot), path(feature_plot)
     path logo
     val pipeline_version
 
@@ -21,6 +21,7 @@ process RENDER_HCV_REPORT {
     def readType = meta.long_reads ? 'long' : 'short'
     def snvMinAf = meta.long_reads ? params.ont_min_snv_af : params.illumina_min_snv_af
     def indelMinAf = meta.long_reads ? params.ont_min_indel_af : params.illumina_min_indel_af
+    def featureArgs = include_feature_plot ? "--feature-plot ${feature_plot} --include-feature-plot" : ""
     def renderScriptMtime = file("${projectDir}/bin/render_hcv_report.py").lastModified()
     """
     # render_hcv_report_py_mtime=${renderScriptMtime}
@@ -32,7 +33,7 @@ process RENDER_HCV_REPORT {
         --best-reference-tsv ${best_reference_tsv} \\
         --coverage-summary ${coverage_summary} \\
         --depth-plot ${depth_plot} \\
-        --feature-plot ${feature_plot} \\
+        ${featureArgs} \\
         --logo ${logo} \\
         --pipeline-version "${pipeline_version}" \\
         --reference-selection-tool "${params.reference_selection_tool}" \\

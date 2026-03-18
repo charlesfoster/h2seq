@@ -15,7 +15,8 @@ def parse_args():
     parser.add_argument("--best-reference-tsv", required=True)
     parser.add_argument("--coverage-summary", required=True)
     parser.add_argument("--depth-plot", required=True)
-    parser.add_argument("--feature-plot", required=True)
+    parser.add_argument("--feature-plot")
+    parser.add_argument("--include-feature-plot", action="store_true")
     parser.add_argument("--logo", required=True)
     parser.add_argument("--pipeline-version", required=True)
     parser.add_argument("--reference-selection-tool", required=True)
@@ -57,7 +58,11 @@ def build_summary_sentence(args):
         f"{qc_description} A closest reference was selected from the configured reference panel based on a read mapping approach, "
         f"reads were aligned to that reference, SNVs were retained from a minimum depth of {args.consensus_min_depth} and minimum allele frequency of {snv_af_pct:.1f}%, "
         f"indels were retained using a minimum allele frequency of {indel_af_pct:.1f}%, and a consensus genome was assembled using a minimum consensus depth of {args.consensus_min_depth}. "
-        f"Coding-region coverage metrics were taken from a downstream resistance-analysis report."
+        + (
+            "Coding-region coverage metrics were taken from a downstream resistance-analysis report."
+            if args.include_feature_plot
+            else "A per-gene HCV coverage panel was not included because no HCV-GLUE result was available for this sample."
+        )
     )
 
 
@@ -67,7 +72,7 @@ def main():
     coverage = read_single_tsv_row(args.coverage_summary)
     logo = mpimg.imread(args.logo)
     depth_plot = mpimg.imread(args.depth_plot)
-    feature_plot = mpimg.imread(args.feature_plot)
+    feature_plot = mpimg.imread(args.feature_plot) if args.include_feature_plot and args.feature_plot else None
     summary_sentence = build_summary_sentence(args)
 
     fig = plt.figure(figsize=(8.27, 11.69), dpi=200)
@@ -104,15 +109,25 @@ def main():
         else:
             cell.set_facecolor("#f7f9fc")
 
-    ax_plot1 = fig.add_subplot(gs[7:14, 0:12])
+    if args.include_feature_plot:
+        depth_rows = slice(7, 14)
+        feature_rows = slice(14, 21)
+        footer_rows = slice(21, 28)
+    else:
+        depth_rows = slice(7, 17)
+        feature_rows = None
+        footer_rows = slice(17, 28)
+
+    ax_plot1 = fig.add_subplot(gs[depth_rows, 0:12])
     ax_plot1.imshow(depth_plot)
     ax_plot1.axis("off")
 
-    ax_plot2 = fig.add_subplot(gs[14:21, 0:12])
-    ax_plot2.imshow(feature_plot)
-    ax_plot2.axis("off")
+    if args.include_feature_plot and feature_plot is not None:
+        ax_plot2 = fig.add_subplot(gs[feature_rows, 0:12])
+        ax_plot2.imshow(feature_plot)
+        ax_plot2.axis("off")
 
-    ax_footer = fig.add_subplot(gs[21:28, 0:12])
+    ax_footer = fig.add_subplot(gs[footer_rows, 0:12])
     ax_footer.axis("off")
     ax_footer.text(0.0, 0.98, "Brief Description", fontsize=11, fontweight="bold", ha="left", va="top")
     ax_footer.text(0.0, 0.86, textwrap.fill(summary_sentence, width=120), fontsize=9, ha="left", va="top")

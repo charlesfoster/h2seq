@@ -21,13 +21,8 @@ custom_content:
     - h2seq_run_summary
     - h2seq_read_statistics
     - h2seq_coverage_statistics
-    - region_coverage
+    - h2seq_region_coverage
     - h2seq_variant_calling
-
-custom_data:
-  region_coverage:
-    section_name: "Coverage Per Genomic Region"
-    description: "HCV gene and polyprotein coverage percentages parsed from HCV-GLUE reports."
 
 export_plots: true
 
