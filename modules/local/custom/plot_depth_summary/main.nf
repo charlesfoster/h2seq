@@ -4,7 +4,7 @@ process PLOT_DEPTH_SUMMARY {
 
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/longqc:1.2.0c--0' :
+        'https://depot.galaxyproject.org/singularity/longqc:1.2.0c--hdfd78af_0' :
         'quay.io/biocontainers/longqc:1.2.0c--hdfd78af_0' }"
 
     input:

@@ -5,6 +5,12 @@ name: nf-core linting comment
 on:
   workflow_run:
     workflows: ["nf-core linting"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: write
 
 jobs:
   test:
