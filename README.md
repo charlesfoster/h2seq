@@ -11,34 +11,77 @@
 
 ## Introduction
 
-**charlesfoster/h2seq** is a bioinformatics pipeline that has been designed to analyse molecular sequencing data of viruses for the H2Seq study. Accordingly, it has been designed with HCV and HIV in mind, but in theory should work with any (most?) viruses. The workflow handles both long-read (ONT) and short-read (Illumina) sequencing data, and can handle tiled amplicon sequencing and/or shotgun/metagenomic/capture probe sequencing.
+**charlesfoster/h2seq** is a bioinformatics pipeline for viral sequencing data developed for the H2Seq study. It is currently focused on HCV-oriented analysis, but it is intended to work with other small viral genomes given an appropriate reference set. The workflow supports ONT long reads, Illumina short reads, or mixed-modality runs, and can be used for tiled amplicon data as well as untargeted sequencing data where primer trimming is skipped.
 
-### Quality Control
+### What The Pipeline Does
 
-1. Read QC ([`FastQC`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/))
-2. Read filtering/trimming
-   - Long reads: ([`NanoQ`](https://github.com/esteinig/nanoq))
-   - Short reads: ([`fastp`](https://github.com/OpenGene/fastp))
-3. Present QC for raw reads ([`MultiQC`](http://multiqc.info/))
+At a high level, the workflow performs:
 
-### Amplicon Sequencing
+1. Input validation and modality-aware preprocessing for long and/or short reads
+2. Read QC and filtering/trimming
+3. Optional automatic reference selection from a multifasta reference set
+4. Reference-guided mapping
+5. Optional primer coordinate inference and primer soft-clipping for amplicon data
+6. Coverage and mapped-read summarisation
+7. Explicit variant calling, filtering, annotation, and consensus sequence generation
+8. Per-sample summary outputs, plots, and MultiQC reporting
 
-1. Selection of closest reference genome
-   - Choice of ([`kallisto`](https://github.com/pachterlab/kallisto)) or ([`salmon`](https://github.com/COMBINE-lab/salmon))
-2. Alignment of reads against closest reference genome using([`minimap2`](https://github.com/lh3/minimap2))
-3. Masking of amplicon primer sequences
-   - Determination of primer coordinates using ([`bwa`](https://github.com/lh3/bwa)) and ([`bedtools`](https://github.com/arq5x/bedtools2))
-   - Soft clipping of primer regions with ([`samtools ampliconclip`](http://www.htslib.org/doc/samtools-ampliconclip.html))
-4. Variant-based consensus genome generation with `Clair3` (ONT) or `LoFreq` (Illumina), followed by [`bcftools consensus`](https://samtools.github.io/bcftools/bcftools.html#consensus)
+### Tools Used
 
-For ONT data, the default `--ont_min_snv_af` is `0.15`. Values below this are not recommended because Clair3 was trained on human data with allele frequencies in the range of 15%-100%.
+The current workflow uses the following primary tools:
+
+- QC and read preprocessing: [`FastQC`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/), [`fastp`](https://github.com/OpenGene/fastp), [`NanoQ`](https://github.com/esteinig/nanoq), [`seqkit`](https://bioinf.shenwei.me/seqkit/)
+- Reference selection: [`salmon`](https://github.com/COMBINE-lab/salmon) or [`kallisto`](https://github.com/pachterlab/kallisto)
+- Read alignment and alignment processing: [`minimap2`](https://github.com/lh3/minimap2), [`bwa`](https://github.com/lh3/bwa), [`samtools`](http://www.htslib.org/), [`bedtools`](https://github.com/arq5x/bedtools2)
+- Coverage analysis: [`mosdepth`](https://github.com/brentp/mosdepth)
+- Variant calling:
+  - ONT: [`Clair3`](https://github.com/HKU-BAL/Clair3)
+  - Illumina: [`LoFreq`](https://csb5.github.io/lofreq/)
+- Variant preparation and consensus generation: [`bcftools`](https://samtools.github.io/bcftools/)
+- Reporting: [`MultiQC`](https://multiqc.info/)
+
+### Workflow Summary
+
+#### Read QC and preprocessing
+
+- Long reads are summarised with `seqkit stats`, filtered with `NanoQ`, and then summarised again after QC.
+- Short reads are summarised with `seqkit stats`, assessed with `FastQC`, filtered/trimmed with `fastp`, and then reassessed with `seqkit stats` and `FastQC`.
+- Samples with no usable reads, no reads after QC, or no mapped reads are handled explicitly and are retained in run-level summaries with explanatory notes instead of crashing the whole run.
+
+#### Reference selection
+
+- The pipeline can automatically select a best-matching reference from a multifasta, either from a user-supplied `--possible_references` file or from the bundled HCV reference set when `--virus_preset hcv` is used.
+- Reference selection uses either `salmon` or `kallisto`, controlled by `--reference_selection_tool`.
+- Alternatively, automatic reference selection can be skipped entirely with `--skip_reference_selection` and a fixed `--reference_fasta`.
+
+#### Mapping and primer trimming
+
+- Long reads and short reads are mapped against the selected reference using dedicated long-read and short-read mapping subworkflows.
+- Primer trimming is optional and is intended for tiled amplicon data. Primer coordinates can be inferred from a primer FASTA using `bwa` and `bedtools`, and primer regions are then soft-clipped with `samtools ampliconclip`.
+- For untargeted data such as shotgun, capture-probe, or metagenomic-style viral sequencing, primer trimming should normally be skipped with `--skip_primer_trimming`.
+
+#### Variant calling and consensus generation
+
+- Variant calling is platform-specific:
+  - ONT data are processed with `Clair3`
+  - Illumina data are processed with `LoFreq`, including an indel-quality preparation step
+- The workflow then prepares the resulting VCFs into a harmonised format, applies explicit filtering and annotation, generates consensus mask regions, and builds the final consensus sequence with `bcftools consensus`.
+- This means the current consensus path is variant-driven rather than relying on `samtools consensus` alone.
+
+#### Coverage, reporting, and HCV-specific outputs
+
+- Coverage is calculated with `mosdepth`, and the pipeline produces depth summaries, mapped-read counts, and per-sample coverage metrics.
+- Custom summary tables and plots are generated for integration into `MultiQC`.
+- When enabled, the optional `HCV-GLUE` integration adds HCV-specific reporting and genomic-region coverage summaries for final consensus genomes.
+
+For ONT data, the default `--ont_min_snv_af` is `0.15`. Values below this are not recommended because Clair3 models were trained in a setting where lower-frequency calls are less reliable.
 
 > [!IMPORTANT]
 > Additional options have been included over time, and this documentation will be updated accordingly at some stage. For now, just view all possible options by running the `--help` command (see: 'Usage' section below).
 
 ### Metagenomic Sequencing
 
-Currently there are no 'specialised' modules for metagenomics data. Just run the pipeline as if your reads are derived from amplicon sequencing, but use the `--skip_primer_trimming` option (see: 'Usage' section below).
+There is no separate metagenomics-specific branch of the workflow. Instead, untargeted viral sequencing data should generally be run through the standard workflow with primer trimming disabled using `--skip_primer_trimming`.
 
 ### Specialised Modules
 
@@ -57,10 +100,8 @@ Please see the upstream Docker installation instructions for `HCV-GLUE`: <https:
 
 ### Future considerations:
 
-- _estimation of the amino acid consequences of SNPs/indels to aid with drug resistance analysis_ (currently only provided via the integrated HCV Glue workflow)
 - _placement of input samples into a phylogenetic tree_
 - _host filtration_
-- _use `pycoQC` for Nanopore QC instead of fastQC_
 
 ## Usage
 
@@ -93,7 +134,7 @@ nextflow run charlesfoster/h2seq \
 ```
 
 > [!IMPORTANT]
-> Development has focused on dependencies being handled by Docker or Apptainer, i.e. by including `-profile docker` or `-profile apptainer`. Currently `-profile conda` will _NOT_ work, but will work in the future.
+> The pipeline is primarily developed and tested with containerised execution using `-profile docker`, `-profile apptainer`, or `-profile singularity`. When running with `-profile conda` it is unlikely but possible that you will run into build errors in a Linux environment, and certain if you are working on a Mac. _Please_ use `-profile docker` on a Mac, or run within a Linux VM.
 
 > [!NOTE]
 > The optional `--run_hcv_glue` step is an exception to the usual dependency model described above. It shells out to Docker directly and expects a pre-existing GLUE database/container setup as described in the `HCV-GLUE` section.

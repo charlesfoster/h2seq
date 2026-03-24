@@ -4,4 +4,4 @@ channels:
   - bioconda
   - defaults
 dependencies:
-  - bioconda::pandas=2.2.1
+  - pandas=2.2.1
