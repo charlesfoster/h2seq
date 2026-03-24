@@ -268,6 +268,7 @@ workflow H2SEQ {
         ch_raw_short_reads_ready,
         ch_fastp_adapter_path,
         false,
+        false,
         false
     )
 

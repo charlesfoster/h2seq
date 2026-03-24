@@ -32,8 +32,26 @@ workflow PREPARE_CONSENSUS_BAM {
                     [meta, fasta]
                 }
 
+            ch_reference_with_index = ch_best_ref_fasta
+                .map { _id, meta, fasta ->
+                    [meta.id, meta, fasta]
+                }
+                .combine(
+                    BWA_INDEX_PRIMERS.out.index
+                        .map { meta, index ->
+                            [meta.id, meta, index]
+                        },
+                    by: 0
+                )
+                .map { _id, meta, fasta, _meta2, index ->
+                    [meta, fasta, index]
+                }
+
             ch_bwa_mem_input = ch_primer_fasta
-                .combine(BWA_INDEX_PRIMERS.out.fasta_and_index)
+                .combine(ch_reference_with_index)
+                .map { primer_meta, primer_fasta, ref_meta, ref_fasta, ref_index ->
+                    [primer_meta, primer_fasta, ref_meta, ref_fasta, ref_index]
+                }
 
             MAP_PRIMERS (
                 ch_bwa_mem_input,

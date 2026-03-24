@@ -15,12 +15,12 @@ The `hcv` preset adds HCV-oriented defaults and enables optional HCV-specific re
 
 The input samplesheet is a CSV with these columns:
 
-| Column | Required | Description |
-| --- | --- | --- |
-| `sample` | yes | Sample identifier. Spaces are not allowed. |
-| `long_reads` | no | Path to an ONT FASTQ or FASTQ.GZ file. |
-| `short_reads_1` | no | Path to Illumina read 1 FASTQ.GZ file. |
-| `short_reads_2` | no | Path to Illumina read 2 FASTQ.GZ file. Required when paired-end short reads are provided. |
+| Column          | Required | Description                                                                               |
+| --------------- | -------- | ----------------------------------------------------------------------------------------- |
+| `sample`        | yes      | Sample identifier. Spaces are not allowed.                                                |
+| `long_reads`    | no       | Path to an ONT FASTQ or FASTQ.GZ file.                                                    |
+| `short_reads_1` | no       | Path to Illumina read 1 FASTQ.GZ file.                                                    |
+| `short_reads_2` | no       | Path to Illumina read 2 FASTQ.GZ file. Required when paired-end short reads are provided. |
 
 Each row must contain at least `long_reads` or `short_reads_1`.
 

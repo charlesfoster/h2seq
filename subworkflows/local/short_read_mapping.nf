@@ -28,8 +28,18 @@ workflow SHORT_READ_MAPPING {
 
     ch_versions = ch_versions.mix(BWA_INDEX.out.versions)
 
-    ch_index_for_combining = BWA_INDEX.out.fasta_and_index
-        .map{ meta, fasta, index ->
+    ch_index_for_combining = ch_best_ref_fasta
+        .map{ _id, meta, fasta ->
+            [meta.id, meta, fasta]
+        }
+        .combine(
+            BWA_INDEX.out.index
+                .map { meta, index ->
+                    [meta.id, meta, index]
+                },
+            by: 0
+        )
+        .map{ _id, meta, fasta, _meta2, index ->
             [meta.id, meta, fasta, index]
         }
 

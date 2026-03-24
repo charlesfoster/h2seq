@@ -3,9 +3,15 @@ process LOFREQ_CALL {
     label 'process_medium'
 
     conda "${moduleDir}/environment.yml"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://quay.io/biocontainers/lofreq:2.1.5--py39h917a906_8' :
-        'quay.io/biocontainers/lofreq:2.1.5--py39h917a906_8' }"
+    container {
+        if (workflow.stubRun) {
+            null
+        } else if (workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container) {
+            'docker://quay.io/biocontainers/lofreq:2.1.5--py39h917a906_8'
+        } else {
+            'quay.io/biocontainers/lofreq:2.1.5--py39h917a906_8'
+        }
+    }
 
     input:
     tuple val(meta), path(bam), path(bai), path(fasta)

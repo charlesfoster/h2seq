@@ -36,7 +36,9 @@ process SAMTOOLS_FAIDX {
     def fastacmd = match[0] ? "touch ${match[0][1]}" : ''
     """
     ${fastacmd}
-    touch ${fasta}.fai
+    ref_name=\$(awk '/^>/{print substr(\$0,2); exit}' ${fasta})
+    ref_len=\$(awk 'BEGIN{n=0} /^>/{next} {gsub(/[[:space:]]/, "", \$0); n+=length(\$0)} END{print n ? n : 100}' ${fasta})
+    printf "%s\\t%s\\t0\\t80\\t81\\n" "\${ref_name:-ref}" "\${ref_len}" > ${fasta}.fai
     if [[ "${fasta.extension}" == "gz" ]]; then
         touch ${fasta}.gzi
     fi
