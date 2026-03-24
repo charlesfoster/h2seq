@@ -7,14 +7,14 @@ process LOFREQ_INDELQUAL {
         if (workflow.stubRun) {
             null
         } else if (workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container) {
-            'docker://quay.io/biocontainers/lofreq:2.1.5--py39h917a906_8'
+            'https://depot.galaxyproject.org/singularity/lofreq:2.1.5--py39h9f2253c_15'
         } else {
-            'quay.io/biocontainers/lofreq:2.1.5--py39h917a906_8'
+            'quay.io/biocontainers/lofreq:2.1.5--py39h9f2253c_15'
         }
     }
 
     input:
-    tuple val(meta), path(bam), path(fasta)
+    tuple val(meta), path(bam), path(fasta), path(fai)
 
     output:
     tuple val(meta), path("*.indelqual.bam"), path("*.indelqual.bam.bai"), emit: bam

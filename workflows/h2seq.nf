@@ -55,6 +55,7 @@ include { LOFREQ_INDELQUAL          } from '../modules/local/custom/lofreq_indel
 include { LOFREQ_CALL               } from '../modules/local/custom/lofreq_call/main'
 include { PREPARE_CLAIR3_VCF        } from '../modules/local/custom/prepare_clair3_vcf/main'
 include { PREPARE_LOFREQ_VCF        } from '../modules/local/custom/prepare_lofreq_vcf/main'
+include { COMPRESS_INDEX_VCF as COMPRESS_PREPARED_LOFREQ_VCF } from '../modules/local/custom/compress_index_vcf/main'
 include { FILTER_VARIANTS           } from '../modules/local/custom/filter_variants/main'
 include { ANNOTATE_VARIANTS         } from '../modules/local/custom/annotate_variants/main'
 include { CREATE_CONSENSUS_MASK     } from '../modules/local/custom/create_consensus_mask/main'
@@ -617,8 +618,8 @@ workflow H2SEQ {
 
     ch_lofreq_indelqual_input = ch_variant_call_input
         .filter { meta, _bam, _bam_idx, _fasta, _fai -> !meta.long_reads }
-        .map { meta, bam, _bam_idx, fasta, _fai ->
-            [meta, bam, fasta]
+        .map { meta, bam, _bam_idx, fasta, fai ->
+            [meta, bam, fasta, fai]
         }
 
     LOFREQ_INDELQUAL (
@@ -631,13 +632,13 @@ workflow H2SEQ {
             [meta.id, meta.long_reads, meta, bam, bai]
         }
         .combine(
-            ch_reference_fai.map { _id, _long_reads, meta, fasta, _fai ->
-                [meta.id, meta.long_reads, meta, fasta]
+            ch_reference_fai.map { _id, _long_reads, meta, fasta, fai ->
+                [meta.id, meta.long_reads, meta, fasta, fai]
             },
             by: [0, 1]
         )
-        .map { _id, _long_reads, meta, bam, bai, _meta2, fasta ->
-            [meta, bam, bai, fasta]
+        .map { _id, _long_reads, meta, bam, bai, _meta2, fasta, fai ->
+            [meta, bam, bai, fasta, fai]
         }
 
     LOFREQ_CALL (
@@ -650,8 +651,13 @@ workflow H2SEQ {
     )
     ch_versions = ch_versions.mix(PREPARE_LOFREQ_VCF.out.versions)
 
+    COMPRESS_PREPARED_LOFREQ_VCF (
+        PREPARE_LOFREQ_VCF.out.vcf
+    )
+    ch_versions = ch_versions.mix(COMPRESS_PREPARED_LOFREQ_VCF.out.versions)
+
     ch_prepared_variants = PREPARE_CLAIR3_VCF.out.vcf
-        .mix(PREPARE_LOFREQ_VCF.out.vcf)
+        .mix(COMPRESS_PREPARED_LOFREQ_VCF.out.vcf)
 
     FILTER_VARIANTS (
         ch_prepared_variants

@@ -69,6 +69,39 @@ def load_seqkit_row(path):
     return rows[0]
 
 
+def summarise_seqkit_rows(path):
+    rows = load_tsv_rows(path)
+    if not rows:
+        raise ValueError(f"No seqkit rows found in {path}")
+
+    counts = [to_int(row.get("num_seqs"), 0) for row in rows]
+    bases = [to_int(row.get("sum_len"), 0) for row in rows]
+    weighted_quality_num = 0.0
+    weighted_quality_den = 0
+
+    for row, base_count in zip(rows, bases):
+        avg_qual = to_float(row.get("AvgQual"))
+        if avg_qual is not None and base_count:
+            weighted_quality_num += avg_qual * base_count
+            weighted_quality_den += base_count
+
+    if len(set(counts)) == 1:
+        read_count = counts[0]
+    else:
+        read_count = sum(counts)
+
+    total_bases = sum(bases)
+    mean_length = (total_bases / sum(counts)) if sum(counts) else None
+    mean_quality = (weighted_quality_num / weighted_quality_den) if weighted_quality_den else None
+
+    return {
+        "num_seqs": read_count,
+        "sum_len": total_bases,
+        "avg_len": mean_length,
+        "AvgQual": mean_quality,
+    }
+
+
 def to_float(value, default=None):
     if value in {"", None}:
         return default
@@ -187,7 +220,7 @@ def build_read_section(outdir):
 
     for path in sorted(outdir.rglob("*.raw_long.tsv")) + sorted(outdir.rglob("*.raw_short.tsv")):
         sample_id, read_type = infer_sample_and_read_type(path)
-        record = load_seqkit_row(path)
+        record = summarise_seqkit_rows(path)
         rows[(sample_id, read_type)] = {
             "sample_id": sample_id,
             "read_type": read_type,
@@ -199,7 +232,7 @@ def build_read_section(outdir):
 
     for path in sorted(outdir.rglob("*.clean_long.tsv")) + sorted(outdir.rglob("*.clean_short.tsv")):
         sample_id, read_type = infer_sample_and_read_type(path)
-        record = load_seqkit_row(path)
+        record = summarise_seqkit_rows(path)
         rows.setdefault((sample_id, read_type), {"sample_id": sample_id, "read_type": read_type})
         rows[(sample_id, read_type)].update(
             {

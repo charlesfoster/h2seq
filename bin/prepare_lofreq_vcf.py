@@ -105,11 +105,11 @@ def main():
 
             if line.startswith("#CHROM"):
                 if not seen_info_dp:
-                    out_handle.write('##INFO=<ID=DP,Number=1,Type=Integer,Description="Depth">\\n')
+                    out_handle.write('##INFO=<ID=DP,Number=1,Type=Integer,Description="Depth">\n')
                 if not seen_info_af:
-                    out_handle.write('##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\\n')
+                    out_handle.write('##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n')
                 if not seen_format_gt:
-                    out_handle.write('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\\n')
+                    out_handle.write('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n')
 
                 columns = line.split("\t")
                 if len(columns) == 8:
