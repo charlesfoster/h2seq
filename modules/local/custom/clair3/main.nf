@@ -21,7 +21,7 @@ process CLAIR3 {
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    /opt/bin/run_clair3.sh  \\
+    run_clair3.sh  \\
         --threads=${task.cpus} \\
         --bam_fn=$bam \\
         --sample_name=$prefix \\
@@ -39,7 +39,7 @@ process CLAIR3 {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        clair3: \$(echo \$(/opt/bin/run_clair3.sh --version 2>&1) | sed 's/^.*v//')
+        clair3: \$(echo \$(run_clair3.sh --version 2>&1) | sed 's/^.*v//')
     END_VERSIONS
     """
 
@@ -51,8 +51,7 @@ process CLAIR3 {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        clair3: \$(echo \$(/opt/bin/run_clair3.sh --version 2>&1) | sed 's/^.*v//')
+        clair3: \$(echo \$(run_clair3.sh --version 2>&1) | sed 's/^.*v//')
     END_VERSIONS
     """
 }
-
