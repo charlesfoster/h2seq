@@ -42,7 +42,8 @@ Present when automatic reference selection is used, and also populated with synt
 
 Typical contents:
 
-- abundance estimates from `salmon` or `kallisto`
+- competitive BAM/BAI and `*.reference_selection_ranking.tsv` files from default `minimap2` reference selection
+- abundance estimates when `--reference_selection_tool salmon` or `--reference_selection_tool kallisto` is used
 - `*.best_reference.tsv`
 - `*.best_reference.txt`
 - selected reference FASTA files

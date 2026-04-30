@@ -31,7 +31,7 @@ At a high level, the workflow performs:
 The current workflow uses the following primary tools:
 
 - QC and read preprocessing: [`FastQC`](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/), [`fastp`](https://github.com/OpenGene/fastp), [`NanoQ`](https://github.com/esteinig/nanoq), [`seqkit`](https://bioinf.shenwei.me/seqkit/)
-- Reference selection: [`salmon`](https://github.com/COMBINE-lab/salmon) or [`kallisto`](https://github.com/pachterlab/kallisto)
+- Reference selection: [`salmon`](https://github.com/COMBINE-lab/salmon), [`kallisto`](https://github.com/pachterlab/kallisto), or competitive [`minimap2`](https://github.com/lh3/minimap2) mapping
 - Read alignment and alignment processing: [`minimap2`](https://github.com/lh3/minimap2), [`bwa`](https://github.com/lh3/bwa), [`samtools`](http://www.htslib.org/), [`bedtools`](https://github.com/arq5x/bedtools2)
 - Coverage analysis: [`mosdepth`](https://github.com/brentp/mosdepth)
 - Variant calling:
@@ -51,7 +51,7 @@ The current workflow uses the following primary tools:
 #### Reference selection
 
 - The pipeline can automatically select a best-matching reference from a multifasta, either from a user-supplied `--possible_references` file or from the bundled HCV reference set when `--virus_preset hcv` is used.
-- Reference selection uses either `salmon` or `kallisto`, controlled by `--reference_selection_tool`.
+- Reference selection uses competitive `minimap2` mapping by default, with `salmon` and `kallisto` available via `--reference_selection_tool`. The `minimap2` mode maps reads to the whole reference panel and ranks primary alignment evidence rather than abundance.
 - Alternatively, automatic reference selection can be skipped entirely with `--skip_reference_selection` and a fixed `--reference_fasta`.
 
 #### Mapping and primer trimming

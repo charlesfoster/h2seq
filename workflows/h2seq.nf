@@ -41,6 +41,9 @@ include { SAMTOOLS_FAIDX                          } from '../modules/nf-core/sam
 // local modules //
 include { CALCULATE_READ_STATS      } from '../modules/local/custom/calculate_read_stats/main'
 include { SELECT_BEST_REFERENCE     } from '../modules/local/custom/select_best_reference/main'
+include { MINIMAP2_REFERENCE_INDEX  } from '../modules/local/custom/minimap2_reference_index/main'
+include { MINIMAP2_COMPETITIVE_MAP  } from '../modules/local/custom/minimap2_competitive_map/main'
+include { SELECT_REFERENCE_FROM_BAM } from '../modules/local/custom/select_reference_from_bam/main'
 include { REMOVE_EMPTY_SEQUENCES    } from '../modules/local/custom/remove_empty_sequences/main'
 include { HCV_GLUE                  } from '../modules/local/custom/hcv_glue/main'
 include { SPLIT_CONSENSUS_GENOMES   } from '../modules/local/custom/split_consensus_genomes/main'
@@ -320,91 +323,131 @@ workflow H2SEQ {
         .unique()
 
     if (!params.skip_reference_selection){
-        if (params.reference_selection_tool == "kallisto") {
-            CALCULATE_READ_STATS(
-                ch_clean_reads_combined
-            )
-            ch_reads_and_stats = CALCULATE_READ_STATS.out.reads_and_stats
-            ch_versions = ch_versions.mix(CALCULATE_READ_STATS.out.versions)
+        if (params.reference_selection_tool == "kallisto" || params.reference_selection_tool == "salmon") {
+            if (params.reference_selection_tool == "kallisto") {
+                CALCULATE_READ_STATS(
+                    ch_clean_reads_combined
+                )
+                ch_reads_and_stats = CALCULATE_READ_STATS.out.reads_and_stats
+                ch_versions = ch_versions.mix(CALCULATE_READ_STATS.out.versions)
 
-            KALLISTO_INDEX (
+                KALLISTO_INDEX (
+                    ch_reference_fasta
+                )
+                ch_reference_fasta_index = KALLISTO_INDEX.out.index
+                ch_versions = ch_versions.mix(KALLISTO_INDEX.out.versions)
+
+                ch_quant_input = ch_reads_and_stats
+                    .combine(ch_reference_fasta_index)
+
+                KALLISTO_QUANT (
+                    ch_quant_input
+                )
+                ch_abundance_tsv = KALLISTO_QUANT.out.tsv
+                ch_versions = ch_versions.mix(KALLISTO_QUANT.out.versions)
+            } else if (params.reference_selection_tool == "salmon") {
+                // Focus on (potential) long reads first
+                ch_map_for_salmon_long = ch_clean_reads_long_ready
+                    .combine(ch_reference_fasta)
+
+                MINIMAP2_ALIGN_SALMON (
+                    ch_map_for_salmon_long,
+                    true, // output in bam format
+                    false, //sort output
+                    "bai",
+                    false,
+                    false
+                )
+                ch_versions = ch_versions.mix(MINIMAP2_ALIGN_SALMON.out.versions)
+                ch_ref_for_salmon = ch_reference_fasta
+                    .map { _meta, fasta ->
+                        [fasta]
+                    }
+
+                ch_input_for_salmon_long = MINIMAP2_ALIGN_SALMON.out.bam
+                    .combine(ch_ref_for_salmon)
+
+                SALMON_QUANT_LONG (
+                    ch_input_for_salmon_long,
+                    [],
+                    true,
+                    "A"
+                )
+                ch_versions = ch_versions.mix(SALMON_QUANT_LONG.out.versions)
+                ch_abundance_tsv_long = SALMON_QUANT_LONG.out.tsv
+
+                // Focus on (potential) short reads second
+                SALMON_INDEX (
+                    ch_ref_for_salmon
+                )
+
+                ch_versions = ch_versions.mix(SALMON_INDEX.out.versions)
+                ch_salmon_idx = SALMON_INDEX.out.index.first()
+
+                ch_input_for_salmon_short = ch_clean_reads_short_ready
+                    .combine(ch_ref_for_salmon)
+
+                SALMON_QUANT_SHORT (
+                    ch_input_for_salmon_short,
+                    ch_salmon_idx,
+                    false,
+                    "A"
+                )
+                ch_versions = ch_versions.mix(SALMON_QUANT_SHORT.out.versions)
+                ch_abundance_tsv_short = SALMON_QUANT_SHORT.out.tsv
+
+                // combine the results
+                ch_abundance_tsv = ch_abundance_tsv_long
+                    .mix(ch_abundance_tsv_short)
+            }
+
+            SELECT_BEST_REFERENCE (
+                ch_abundance_tsv
+            )
+
+            ch_best_ref_tsv = SELECT_BEST_REFERENCE.out.best_ref_tsv
+            ch_best_ref_txt = SELECT_BEST_REFERENCE.out.best_ref_txt
+            ch_alt_ref_txt = SELECT_BEST_REFERENCE.out.alt_ref_txt
+            ch_versions = ch_versions.mix(SELECT_BEST_REFERENCE.out.versions)
+        } else if (params.reference_selection_tool == "minimap2") {
+            MINIMAP2_REFERENCE_INDEX (
                 ch_reference_fasta
             )
-            ch_reference_fasta_index = KALLISTO_INDEX.out.index
-            ch_versions = ch_versions.mix(KALLISTO_INDEX.out.versions)
+            ch_versions = ch_versions.mix(MINIMAP2_REFERENCE_INDEX.out.versions)
 
-            ch_quant_input = ch_reads_and_stats
-                .combine(ch_reference_fasta_index)
-
-            KALLISTO_QUANT (
-                ch_quant_input
-            )
-            ch_abundance_tsv = KALLISTO_QUANT.out.tsv
-            ch_versions = ch_versions.mix(KALLISTO_QUANT.out.versions)
-        } else if (params.reference_selection_tool == "salmon") {
-            // Focus on (potential) long reads first
-            ch_map_for_salmon_long = ch_clean_reads_long_ready
-                .combine(ch_reference_fasta)
-
-            MINIMAP2_ALIGN_SALMON (
-                ch_map_for_salmon_long,
-                true, // output in bam format
-                false, //sort output
-                "bai",
-                false,
-                false
-            )
-            ch_versions = ch_versions.mix(MINIMAP2_ALIGN_SALMON.out.versions)
-            ch_ref_for_salmon = ch_reference_fasta
-                .map { _meta, fasta ->
-                    [fasta]
+            ch_reference_panel_for_minimap2 = ch_reference_fasta
+                .map { meta, fasta ->
+                    [meta.id, meta, fasta]
+                }
+                .combine(
+                    MINIMAP2_REFERENCE_INDEX.out.index.map { meta, index ->
+                        [meta.id, meta, index]
+                    },
+                    by: 0
+                )
+                .map { _id, reference_meta, reference_fasta, _index_meta, reference_index ->
+                    [reference_meta, reference_fasta, reference_index]
                 }
 
-            ch_input_for_salmon_long = MINIMAP2_ALIGN_SALMON.out.bam
-                .combine(ch_ref_for_salmon)
+            ch_competitive_map_input = ch_clean_reads_combined
+                .combine(ch_reference_panel_for_minimap2)
+                .map { meta, reads, reference_meta, reference_fasta, reference_index ->
+                    [meta, reads, reference_meta, reference_fasta, reference_index]
+                }
 
-            SALMON_QUANT_LONG (
-                ch_input_for_salmon_long,
-                [],
-                true,
-                "A"
+            MINIMAP2_COMPETITIVE_MAP (
+                ch_competitive_map_input
             )
-            ch_versions = ch_versions.mix(SALMON_QUANT_LONG.out.versions)
-            ch_abundance_tsv_long = SALMON_QUANT_LONG.out.tsv
+            ch_versions = ch_versions.mix(MINIMAP2_COMPETITIVE_MAP.out.versions)
 
-            // Focus on (potential) short reads second
-            SALMON_INDEX (
-                ch_ref_for_salmon
+            SELECT_REFERENCE_FROM_BAM (
+                MINIMAP2_COMPETITIVE_MAP.out.bam
             )
-
-            ch_versions = ch_versions.mix(SALMON_INDEX.out.versions)
-            ch_salmon_idx = SALMON_INDEX.out.index.first()
-
-            ch_input_for_salmon_short = ch_clean_reads_short_ready
-                .combine(ch_ref_for_salmon)
-
-            SALMON_QUANT_SHORT (
-                ch_input_for_salmon_short,
-                ch_salmon_idx,
-                false,
-                "A"
-            )
-            ch_versions = ch_versions.mix(SALMON_QUANT_SHORT.out.versions)
-            ch_abundance_tsv_short = SALMON_QUANT_SHORT.out.tsv
-
-            // combine the results
-            ch_abundance_tsv = ch_abundance_tsv_long
-                .mix(ch_abundance_tsv_short)
+            ch_best_ref_tsv = SELECT_REFERENCE_FROM_BAM.out.best_ref_tsv
+            ch_best_ref_txt = SELECT_REFERENCE_FROM_BAM.out.best_ref_txt
+            ch_alt_ref_txt = SELECT_REFERENCE_FROM_BAM.out.alt_ref_txt
+            ch_versions = ch_versions.mix(SELECT_REFERENCE_FROM_BAM.out.versions)
         }
-
-        SELECT_BEST_REFERENCE (
-            ch_abundance_tsv
-        )
-
-        ch_best_ref_tsv = SELECT_BEST_REFERENCE.out.best_ref_tsv
-        ch_best_ref_txt = SELECT_BEST_REFERENCE.out.best_ref_txt
-        ch_alt_ref_txt = SELECT_BEST_REFERENCE.out.alt_ref_txt
-        ch_versions = ch_versions.mix(SELECT_BEST_REFERENCE.out.versions)
 
         ch_alt_seqkit_input = ch_reference_fasta
             .combine(ch_alt_ref_txt)
@@ -417,18 +460,18 @@ workflow H2SEQ {
 
         ch_best_ref_fasta = SEQKIT_GREP.out.filter
             .map{ meta, fasta ->
-                [meta.id, meta, fasta]
+                [meta.id, meta.long_reads, meta, fasta]
             }
 
         ch_best_ref_long = ch_best_ref_fasta
-            .combine(ch_long_sample_ids, by: 0)
-            .map { sample_id, meta, fasta ->
+            .filter { _sample_id, long_reads, _meta, _fasta -> long_reads }
+            .map { sample_id, _long_reads, meta, fasta ->
                 [sample_id, meta, fasta]
             }
 
         ch_best_ref_short = ch_best_ref_fasta
-            .combine(ch_short_sample_ids, by: 0)
-            .map { sample_id, meta, fasta ->
+            .filter { _sample_id, long_reads, _meta, _fasta -> !long_reads }
+            .map { sample_id, _long_reads, meta, fasta ->
                 [sample_id, meta, fasta]
             }
     } else {

@@ -214,10 +214,10 @@
                 },
                 "reference_selection_tool": {
                     "type": "string",
-                    "default": "salmon",
+                    "default": "minimap2",
                     "description": "Tool to use for best reference selection",
-                    "help_text": "Tool to use for reference selection: either 'salmon' or 'kallisto'.",
-                    "enum": ["salmon", "kallisto"],
+                    "help_text": "Tool to use for reference selection: 'minimap2', 'salmon', or 'kallisto'. The default minimap2 mode competitively maps reads to the whole reference panel and ranks primary alignment evidence.",
+                    "enum": ["salmon", "kallisto", "minimap2"],
                     "fa_icon": "fas fa-hammer",
                     "hidden": true
                 },
@@ -227,6 +227,39 @@
                     "hidden": true,
                     "help_text": "Must be provided as a string within quotes.",
                     "fa_icon": "fas fa-search-plus"
+                },
+                "minimap2_reference_selection_long_preset": {
+                    "type": "string",
+                    "default": "map-ont",
+                    "description": "minimap2 preset for long-read competitive reference selection.",
+                    "help_text": "minimap2 preset used by --reference_selection_tool minimap2 for long reads. Use map-ont for ONT, map-hifi for PacBio HiFi, or map-pb for PacBio CLR.",
+                    "enum": ["map-ont", "map-hifi", "map-pb"],
+                    "hidden": true,
+                    "fa_icon": "fas fa-hammer"
+                },
+                "minimap2_reference_selection_short_preset": {
+                    "type": "string",
+                    "default": "sr",
+                    "description": "minimap2 preset for short-read competitive reference selection.",
+                    "help_text": "minimap2 preset used by --reference_selection_tool minimap2 for short reads.",
+                    "enum": ["sr"],
+                    "hidden": true,
+                    "fa_icon": "fas fa-hammer"
+                },
+                "extra_minimap2_reference_selection_args": {
+                    "type": "string",
+                    "description": "Extra arguments passed to minimap2 during competitive reference selection.",
+                    "help_text": "Additional minimap2 arguments used only when --reference_selection_tool minimap2 is selected.",
+                    "hidden": true,
+                    "fa_icon": "fas fa-search-plus"
+                },
+                "minimap2_reference_selection_short_breadth_tiebreaker": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Use reference coverage breadth as an additional short-read reference-selection tie-breaker.",
+                    "help_text": "When using --reference_selection_tool minimap2 with short reads, rank tied references by breadth of reference coverage before the remaining alignment-evidence tie-breakers.",
+                    "hidden": true,
+                    "fa_icon": "fas fa-question-circle"
                 },
                 "abundance_top_percentage": {
                     "type": "number",
@@ -451,6 +484,17 @@
                     "fa_icon": "fas fa-book",
                     "help_text": "If using a reference genome configured in the pipeline using iGenomes, use this parameter to give the ID for the reference. This is then used to build the full paths for all required host reference genome files e.g. `--genome GRCh38`. \n\nSee the [nf-core website docs](https://nf-co.re/usage/reference_genomes) for more details."
                 },
+                "genome": {
+                    "type": ["string", "null"],
+                    "default": null,
+                    "hidden": true,
+                    "description": "Internal iGenomes genome key."
+                },
+                "genomes": {
+                    "type": ["object", "null"],
+                    "hidden": true,
+                    "description": "Internal iGenomes reference map loaded from igenomes.config."
+                },
                 "host_fasta": {
                     "type": "string",
                     "format": "file-path",
@@ -468,6 +512,12 @@
                     "fa_icon": "fas fa-ban",
                     "hidden": true,
                     "help_text": "Do not load `igenomes.config` when running the pipeline. You may choose this option if you observe clashes between custom parameters and those supplied in `igenomes.config`."
+                },
+                "igenomes_base": {
+                    "type": "string",
+                    "default": "s3://ngi-igenomes/igenomes/",
+                    "hidden": true,
+                    "description": "Base path for iGenomes references."
                 }
             }
         },
@@ -581,6 +631,11 @@
                     "help_text": "The Nextflow `publishDir` option specifies which intermediate files should be saved to the output directory. This option tells the pipeline what method should be used to move these files. See [Nextflow docs](https://www.nextflow.io/docs/latest/process.html#publishdir) for details.",
                     "fa_icon": "fas fa-copy",
                     "enum": ["symlink", "rellink", "link", "copy", "copyNoFollow", "move"],
+                    "hidden": true
+                },
+                "trace_timestamp": {
+                    "type": "string",
+                    "description": "Internal timestamp suffix used for run-specific pipeline_info filenames.",
                     "hidden": true
                 },
                 "email_on_fail": {

@@ -48,6 +48,8 @@ nextflow run charlesfoster/h2seq \
   --virus_preset hcv
 ```
 
+By default, automatic reference selection uses competitive `minimap2` mapping against the reference panel.
+
 Automatic reference selection from a user-supplied multifasta:
 
 ```bash
@@ -56,6 +58,17 @@ nextflow run charlesfoster/h2seq \
   --input samplesheet.csv \
   --outdir results \
   --possible_references references.fasta
+```
+
+Competitive minimap2 reference selection from a user-supplied multifasta:
+
+```bash
+nextflow run charlesfoster/h2seq \
+  -profile docker \
+  --input samplesheet.csv \
+  --outdir results \
+  --possible_references references.fasta \
+  --reference_selection_tool minimap2
 ```
 
 Skip reference selection and map directly to one reference:
