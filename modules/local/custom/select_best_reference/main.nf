@@ -23,7 +23,7 @@ process SELECT_BEST_REFERENCE {
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    select_best_reference.py \\
+    python3 ${projectDir}/bin/select_best_reference.py \\
         --input $abundances \\
         --sample_name $prefix \\
         --output ${prefix}.best_reference.tsv \\

@@ -1,0 +1,50 @@
+Changes in component 'nf-core/kallisto/index'
+'modules/nf-core/kallisto/index/environment.yml' is unchanged
+'modules/nf-core/kallisto/index/meta.yml' is unchanged
+Changes in 'kallisto/index/main.nf':
+--- modules/nf-core/kallisto/index/main.nf
++++ modules/nf-core/kallisto/index/main.nf
+@@ -4,15 +4,15 @@
+ 
+     conda "${moduleDir}/environment.yml"
+     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+-        'https://depot.galaxyproject.org/singularity/kallisto:0.51.1--heb0cbe2_0':
+-        'biocontainers/kallisto:0.51.1--heb0cbe2_0' }"
++        'https://depot.galaxyproject.org/singularity/kallisto:0.48.0--h15996b6_2':
++        'biocontainers/kallisto:0.48.0--h15996b6_2' }"
+ 
+     input:
+     tuple val(meta), path(fasta)
+ 
+     output:
+     tuple val(meta), path("kallisto")  , emit: index
+-    tuple val("${task.process}"), val('kallisto'), eval('kallisto 2>&1 | head -1 | sed "s/^kallisto //; s/Usage.*//"'), emit: versions_kallisto, topic: versions
++    path "versions.yml"                , emit: versions
+ 
+     when:
+     task.ext.when == null || task.ext.when
+@@ -25,10 +25,20 @@
+         $args \\
+         -i kallisto \\
+         $fasta
++
++    cat <<-END_VERSIONS > versions.yml
++    "${task.process}":
++        kallisto: \$(echo \$(kallisto 2>&1) | sed 's/^kallisto //; s/Usage.*\$//')
++    END_VERSIONS
+     """
+ 
+     stub:
+     """
+     mkdir kallisto
++
++    cat <<-END_VERSIONS > versions.yml
++    "${task.process}":
++        kallisto: \$(echo \$(kallisto 2>&1) | sed 's/^kallisto //; s/Usage.*\$//')
++    END_VERSIONS
+     """
+ }
+
+'modules/nf-core/kallisto/index/tests/main.nf.test.snap' is unchanged
+'modules/nf-core/kallisto/index/tests/main.nf.test' is unchanged
+************************************************************

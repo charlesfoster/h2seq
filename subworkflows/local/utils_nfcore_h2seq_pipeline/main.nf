@@ -14,11 +14,11 @@ include { samplesheetToList         } from 'plugin/nf-schema'
 include { UTILS_NEXTFLOW_PIPELINE   } from '../../nf-core/utils_nextflow_pipeline'
 include { completionEmail           } from '../../nf-core/utils_nfcore_pipeline'
 include { completionSummary         } from '../../nf-core/utils_nfcore_pipeline'
-include { dashedLine                } from '../../nf-core/utils_nfcore_pipeline'
-include { nfCoreLogo                } from '../../nf-core/utils_nfcore_pipeline'
-include { imNotification            } from '../../nf-core/utils_nfcore_pipeline'
+// include { dashedLine                } from '../../nf-core/utils_nfcore_pipeline'
+// include { nfCoreLogo                } from '../../nf-core/utils_nfcore_pipeline'
+// include { imNotification            } from '../../nf-core/utils_nfcore_pipeline'
 include { UTILS_NFCORE_PIPELINE     } from '../../nf-core/utils_nfcore_pipeline'
-include { workflowCitation          } from '../../nf-core/utils_nfcore_pipeline'
+// include { workflowCitation          } from '../../nf-core/utils_nfcore_pipeline'
 
 /*
 ========================================================================================
@@ -51,12 +51,19 @@ workflow PIPELINE_INITIALISATION {
         workflow.profile.tokenize(',').intersect(['conda', 'mamba']).size() >= 1
     )
 
+    def String workflow_command = "nextflow run ${workflow.manifest.name} -profile <docker/singularity/.../institute> --input samplesheet.csv --outdir <OUTDIR>"
+
+    //
+    // Print help and exit before validation, so required runtime parameters are not needed.
+    //
+    if (help && help.toString() != "false") {
+        log.info renderPipelineHelp("${projectDir}/nextflow_schema.json", workflow_command, help)
+        System.exit(0)
+    }
+
     //
     // Validate parameters and generate parameter summary to stdout
     //
-    pre_help_text = nfCoreLogo(monochrome_logs)
-    post_help_text = '\n' + workflowCitation() + '\n' + dashedLine(monochrome_logs)
-    def String workflow_command = "nextflow run ${workflow.manifest.name} -profile <docker/singularity/.../institute> --input samplesheet.csv --outdir <OUTDIR>"
     UTILS_NFSCHEMA_PLUGIN (
         workflow,
         validate_params,
@@ -156,9 +163,9 @@ workflow PIPELINE_COMPLETION {
 
         completionSummary(monochrome_logs)
 
-        if (hook_url) {
-            imNotification(summary_params, hook_url)
-        }
+        // if (hook_url) {
+        //     imNotification(summary_params, hook_url)
+        // }
     }
 
     workflow.onError {
@@ -171,6 +178,104 @@ workflow PIPELINE_COMPLETION {
     FUNCTIONS
 ========================================================================================
 */
+
+def formatSchemaType(type) {
+    if (type instanceof List) {
+        return type.join("|")
+    }
+    return type ?: ""
+}
+
+def visibleSchemaProperties(group, showHidden) {
+    def properties = group.properties ?: [:]
+    return properties.findAll { name, options ->
+        showHidden || !options.hidden
+    }
+}
+
+def schemaGroups(schema) {
+    def defs = schema.'$defs' ?: schema.definitions ?: [:]
+    return (schema.allOf ?: [])
+        .collect { ref ->
+            def refText = ref.'$ref'
+            if (!refText) {
+                return null
+            }
+            def groupName = refText.tokenize('/').last()
+            def group = defs[groupName]
+            group ? [name: groupName, group: group] : null
+        }
+        .findAll { it != null }
+}
+
+def renderDetailedParamHelp(paramName, paramOptions) {
+    def lines = []
+    lines << ""
+    lines << "--${paramName}"
+    lines << "    type        : ${formatSchemaType(paramOptions.type)}"
+    if (paramOptions.containsKey("default")) {
+        lines << "    default     : ${paramOptions.default}"
+    }
+    if (paramOptions.get("enum")) {
+        lines << "    options     : ${paramOptions.get("enum").join(', ')}"
+    }
+    lines << "    description : ${paramOptions.description ?: ''}"
+    if (paramOptions.help_text) {
+        lines << ""
+        lines << paramOptions.help_text
+    }
+    return lines.join("\n")
+}
+
+def renderPipelineHelp(schemaPath, workflowCommand, helpParam) {
+    def schema = new groovy.json.JsonSlurper().parse(new File(schemaPath))
+    def showHidden = params.containsKey("showHidden") ? params.showHidden : false
+    def requestedParam = helpParam instanceof String && !(helpParam in ["true", "false"]) ? helpParam : ""
+    def groups = schemaGroups(schema)
+
+    if (requestedParam) {
+        def found = null
+        groups.each { groupInfo ->
+            if (!found && groupInfo.group.properties?.containsKey(requestedParam)) {
+                found = groupInfo.group.properties[requestedParam]
+            }
+        }
+        if (!found) {
+            error("Unable to create help message: Specified param '${requestedParam}' does not exist in JSON schema.")
+        }
+        return renderDetailedParamHelp(requestedParam, found)
+    }
+
+    def lines = []
+    lines << ""
+    lines << workflow.manifest.name
+    lines << ""
+    lines << "Usage:"
+    lines << "  ${workflowCommand}"
+    lines << ""
+
+    groups.each { groupInfo ->
+        def group = groupInfo.group
+        def properties = visibleSchemaProperties(group, showHidden)
+        if (!properties) {
+            return
+        }
+
+        lines << group.title
+        properties.each { name, options ->
+            def type = formatSchemaType(options.type)
+            def description = options.description ?: ""
+            def defaultText = options.containsKey("default") ? " [default: ${options.default}]" : ""
+            lines << "  --${name.padRight(34)} ${type.padRight(14)} ${description}${defaultText}"
+        }
+        lines << ""
+    }
+
+    lines << "Use --help <parameter> for detailed help for a single parameter."
+    lines << "Use --showHidden with --help to include hidden/internal parameters."
+    return lines.join("\n")
+}
+
 //
 // Check and validate pipeline parameters
 //
@@ -322,7 +427,9 @@ def methodsDescriptionText(mqc_methods_yaml) {
         // Removing ` ` since the manifest.doi is a string and not a proper list
         def temp_doi_ref = ""
         String[] manifest_doi = meta.manifest_map.doi.tokenize(",")
-        for (String doi_ref: manifest_doi) temp_doi_ref += "(doi: <a href=\'https://doi.org/${doi_ref.replace("https://doi.org/", "").replace(" ", "")}\'>${doi_ref.replace("https://doi.org/", "").replace(" ", "")}</a>), "
+        manifest_doi.each { doi_ref ->
+            temp_doi_ref += "(doi: <a href=\'https://doi.org/${doi_ref.replace("https://doi.org/", "").replace(" ", "")}\'>${doi_ref.replace("https://doi.org/", "").replace(" ", "")}</a>), "
+        }
         meta["doi_text"] = temp_doi_ref.substring(0, temp_doi_ref.length() - 2)
     } else meta["doi_text"] = ""
     meta["nodoi_text"] = meta.manifest_map.doi ? "" : "<li>If available, make sure to update the text to include the Zenodo DOI of version of the pipeline used. </li>"

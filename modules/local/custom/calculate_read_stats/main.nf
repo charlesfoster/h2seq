@@ -11,7 +11,7 @@ process CALCULATE_READ_STATS {
     tuple val(meta), path(reads)
 
     output:
-    tuple val(meta), path(reads), (env mean_length), (env std_dev) , emit: reads_and_stats
+    tuple val(meta), path(reads), env("mean_length"), env("std_dev") , emit: reads_and_stats
     path "versions.yml"                                                               , emit: versions
 
     when:

@@ -4,24 +4,62 @@ Changes in component 'nf-core/seqkit/stats'
 Changes in 'seqkit/stats/main.nf':
 --- modules/nf-core/seqkit/stats/main.nf
 +++ modules/nf-core/seqkit/stats/main.nf
-@@ -31,4 +31,15 @@
-         seqkit: \$( seqkit version | sed 's/seqkit v//' )
-     END_VERSIONS
+@@ -1,18 +1,18 @@
+ process SEQKIT_STATS {
+-    tag "${meta.id}"
++    tag "$meta.id"
+     label 'process_low'
+ 
+     conda "${moduleDir}/environment.yml"
+-    container "${workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container
+-        ? 'https://depot.galaxyproject.org/singularity/seqkit:2.9.0--h9ee0642_0'
+-        : 'biocontainers/seqkit:2.9.0--h9ee0642_0'}"
++    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
++        'https://depot.galaxyproject.org/singularity/seqkit:2.8.1--h9ee0642_0' :
++        'biocontainers/seqkit:2.8.1--h9ee0642_0' }"
+ 
+     input:
+     tuple val(meta), path(reads)
+ 
+     output:
+     tuple val(meta), path("*.tsv"), emit: stats
+-    tuple val("${task.process}"), val('seqkit'), eval("seqkit version | sed 's/^.*v//'"), emit: versions_seqkit, topic: versions
++    path "versions.yml"           , emit: versions
+ 
+     when:
+     task.ext.when == null || task.ext.when
+@@ -23,14 +23,26 @@
      """
-+
-+    stub:
-+    def prefix = task.ext.prefix ?: "${meta.id}"
-+    """
-+    touch '${prefix}.tsv'
+     seqkit stats \\
+         --tabular \\
+-        --threads ${task.cpus} \\
+-        ${args} \\
+-        ${reads} > '${prefix}.tsv'
++        $args \\
++        $reads > '${prefix}.tsv'
 +
 +    cat <<-END_VERSIONS > versions.yml
 +    "${task.process}":
 +        seqkit: \$( seqkit version | sed 's/seqkit v//' )
 +    END_VERSIONS
-+    """
+     """
+ 
+     stub:
+     def prefix = task.ext.prefix ?: "${meta.id}"
+     """
+-    touch ${prefix}.tsv
++    cat <<-END_STATS > '${prefix}.tsv'
++    file	format	type	num_seqs	sum_len	min_len	avg_len	max_len
++    ${prefix}	fastq	DNA	1	100	100	100	100
++    END_STATS
++
++    cat <<-END_VERSIONS > versions.yml
++    "${task.process}":
++        seqkit: \$( seqkit version | sed 's/seqkit v//' )
++    END_VERSIONS
+     """
  }
 
 'modules/nf-core/seqkit/stats/tests/main.nf.test.snap' is unchanged
-'modules/nf-core/seqkit/stats/tests/tags.yml' is unchanged
 'modules/nf-core/seqkit/stats/tests/main.nf.test' is unchanged
 ************************************************************

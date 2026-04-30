@@ -31,7 +31,6 @@ process SAMTOOLS_SORT {
 
     """
     samtools cat \\
-        --threads $task.cpus \\
         ${bam} \\
     | \\
     samtools sort \\

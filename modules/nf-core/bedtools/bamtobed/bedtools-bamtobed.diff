@@ -1,13 +1,62 @@
-Changes in module 'nf-core/bedtools/bamtobed'
+Changes in component 'nf-core/bedtools/bamtobed'
+'modules/nf-core/bedtools/bamtobed/environment.yml' is unchanged
+'modules/nf-core/bedtools/bamtobed/meta.yml' is unchanged
+Changes in 'bedtools/bamtobed/main.nf':
 --- modules/nf-core/bedtools/bamtobed/main.nf
 +++ modules/nf-core/bedtools/bamtobed/main.nf
-@@ -1,6 +1,6 @@
+@@ -1,18 +1,18 @@
  process BEDTOOLS_BAMTOBED {
-     tag "$meta.id"
+-    tag "${meta.id}"
 -    label 'process_medium'
++    tag "$meta.id"
 +    label 'process_single'
  
      conda "${moduleDir}/environment.yml"
-     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+-    container "${workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container
+-        ? 'https://depot.galaxyproject.org/singularity/bedtools:2.31.1--hf5e1c6e_0'
+-        : 'biocontainers/bedtools:2.31.1--hf5e1c6e_0'}"
++    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
++        'https://depot.galaxyproject.org/singularity/bedtools:2.31.1--hf5e1c6e_0' :
++        'biocontainers/bedtools:2.31.1--hf5e1c6e_0' }"
+ 
+     input:
+     tuple val(meta), path(bam)
+ 
+     output:
+     tuple val(meta), path("*.bed"), emit: bed
+-    tuple val("${task.process}"), val('bedtools'), eval("bedtools --version | sed -e 's/bedtools v//g'"), topic: versions, emit: versions_bedtools
++    path  "versions.yml"          , emit: versions
+ 
+     when:
+     task.ext.when == null || task.ext.when
+@@ -23,14 +23,24 @@
+     """
+     bedtools \\
+         bamtobed \\
+-        ${args} \\
+-        -i ${bam} \\
++        $args \\
++        -i $bam \\
+         > ${prefix}.bed
++
++    cat <<-END_VERSIONS > versions.yml
++    "${task.process}":
++        bedtools: \$(bedtools --version | sed -e "s/bedtools v//g")
++    END_VERSIONS
+     """
+ 
+     stub:
+     def prefix = task.ext.prefix ?: "${meta.id}"
+     """
+     touch ${prefix}.bed
++
++    cat <<-END_VERSIONS > versions.yml
++    "${task.process}":
++        bedtools: \$(bedtools --version | sed -e "s/bedtools v//g")
++    END_VERSIONS
+     """
+ }
 
+'modules/nf-core/bedtools/bamtobed/tests/main.nf.test.snap' is unchanged
+'modules/nf-core/bedtools/bamtobed/tests/main.nf.test' is unchanged
 ************************************************************

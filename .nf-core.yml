@@ -2,6 +2,7 @@ lint:
   nf_test_content: False
   files_exist:
     - CODE_OF_CONDUCT.md
+    - docs/CONTRIBUTING.md
     - assets/nf-core-h2seq_logo_light.png
     - docs/images/nf-core-h2seq_logo_light.png
     - docs/images/nf-core-h2seq_logo_dark.png
@@ -15,6 +16,10 @@ lint:
     - nf-test.config
     - tests/default.nf.test
     - .github/workflows/release-announcements.yml
+    - conf/igenomes_ignored.config
+    - ro-crate-metadata.json
+    - subworkflows/nf-core/utils_nfcore_pipeline
+    - subworkflows/nf-core/utils_nextflow_pipeline
   files_unchanged:
     - CODE_OF_CONDUCT.md
     - assets/nf-core-h2seq_logo_light.png
@@ -30,10 +35,11 @@ lint:
     - process.memory
     - process.time
     - custom_config
+    - manifest.version
     - params.max_cpus
     - params.max_memory
     - params.max_time
-nf_core_version: 3.3.2
+nf_core_version: 4.0.0
 repository_type: pipeline
 template:
   prefix: charlesfoster

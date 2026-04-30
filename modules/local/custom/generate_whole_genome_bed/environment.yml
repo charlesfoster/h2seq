@@ -1,0 +1,5 @@
+name: generate_whole_genome_bed
+channels:
+  - conda-forge
+dependencies:
+  - bash=5.2.21

@@ -1,0 +1,6 @@
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - lofreq=2.1.5
+  - htslib=1.20

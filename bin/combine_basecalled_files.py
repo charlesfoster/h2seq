@@ -92,13 +92,13 @@ def main(basecall_default_path, input_path, legacy, overwrite, outdir, compresse
             print(f"Some metadata will be set to 'unknown'")
         try:
             instrument, flow_cell_id, protocol = parse_final_summary(summary_file[0])
-        except:
+        except (IndexError, OSError, ValueError):
             instrument, flow_cell_id, protocol = 'unknown', 'unknown', 'unknown'
         fastq_dir = barcode_dir[0]
         if not compressed:
-            fastq_files = [f for f in fastq_dir.glob('*.fastq') if not f.name.startswith('.')]
+            fastq_files = sorted(f for f in fastq_dir.glob('*.fastq') if not f.name.startswith('.'))
         else:
-            fastq_files = [f for f in fastq_dir.glob('*.fastq.gz') if not f.name.startswith('.')]
+            fastq_files = sorted(f for f in fastq_dir.glob('*.fastq.gz') if not f.name.startswith('.'))
         if not fastq_files:
             raise ValueError(f"No .fastq(.gz) files found in {fastq_dir}")
 

@@ -1,0 +1,6 @@
+name: reference_metadata_from_fasta
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - bash=5.2.21

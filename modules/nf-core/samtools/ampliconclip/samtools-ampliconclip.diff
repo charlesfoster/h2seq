@@ -1,34 +1,23 @@
 Changes in component 'nf-core/samtools/ampliconclip'
-Changes in 'samtools/ampliconclip/environment.yml':
---- modules/nf-core/samtools/ampliconclip/environment.yml
-+++ modules/nf-core/samtools/ampliconclip/environment.yml
-@@ -1,8 +1,10 @@
- name: samtools_ampliconclip
-+
- channels:
-   - conda-forge
-   - bioconda
-   - defaults
-+
- dependencies:
-+  - bioconda::htslib=1.20
-   - bioconda::samtools=1.20
--  - bioconda::htslib=1.20
-
+'modules/nf-core/samtools/ampliconclip/environment.yml' is unchanged
 'modules/nf-core/samtools/ampliconclip/meta.yml' is unchanged
 Changes in 'samtools/ampliconclip/main.nf':
 --- modules/nf-core/samtools/ampliconclip/main.nf
 +++ modules/nf-core/samtools/ampliconclip/main.nf
-@@ -1,6 +1,6 @@
+@@ -1,23 +1,22 @@
  process SAMTOOLS_AMPLICONCLIP {
-     tag "$meta.id"
+-    tag "${meta.id}"
 -    label 'process_medium'
++    tag "$meta.id"
 +    label 'process_low'
  
      conda "${moduleDir}/environment.yml"
-     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-@@ -8,8 +8,7 @@
-         'biocontainers/samtools:1.20--h50ea8bc_0' }"
+-    container "${workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container
+-        ? 'https://community-cr-prod.seqera.io/docker/registry/v2/blobs/sha256/e5/e5598451c6d348cce36191bafe1911ad71e440137d7a329da946f2b0dbb0e7f3/data'
+-        : 'community.wave.seqera.io/library/htslib_samtools:1.23--cde2c40a51d6f752'}"
++    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
++        'https://depot.galaxyproject.org/singularity/samtools:1.20--h50ea8bc_0' :
++        'biocontainers/samtools:1.20--h50ea8bc_0' }"
  
      input:
 -    tuple val(meta), path(bam)
@@ -37,26 +26,68 @@ Changes in 'samtools/ampliconclip/main.nf':
      val save_cliprejects
      val save_clipstats
  
-@@ -27,7 +26,7 @@
+     output:
+-    tuple val(meta), path("*.clipallowed.bam"), emit: bam
+-    tuple val(meta), path("*.clipstats.txt"), optional: true, emit: stats
+-    tuple val(meta), path("*.cliprejects.bam"), optional: true, emit: rejects_bam
+-    tuple val("${task.process}"), val('samtools'), eval("samtools version | sed '1!d;s/.* //'"), topic: versions, emit: versions_samtools
++    tuple val(meta), path("*.clipallowed.bam")  , emit: bam
++    tuple val(meta), path("*.clipstats.txt")    , optional:true, emit: stats
++    tuple val(meta), path("*.cliprejects.bam")  , optional:true, emit: rejects_bam
++    path "versions.yml"                         , emit: versions
+ 
+     when:
+     task.ext.when == null || task.ext.when
+@@ -26,36 +25,41 @@
+     def args = task.ext.args ?: ''
      def prefix = task.ext.prefix ?: "${meta.id}"
      def rejects = save_cliprejects ? "--rejects-file ${prefix}.cliprejects.bam" : ""
-     def stats   = save_clipstats   ? "-f ${prefix}.clipstats.txt"               : ""
--    if ("$bam" == "${prefix}.bam") error "Input and output names are the same, use \"task.ext.prefix\" to disambiguate!"
+-    def stats = save_clipstats ? "-f ${prefix}.clipstats.txt" : ""
+-    if ("${bam}" == "${prefix}.bam") {
+-        error("Input and output names are the same, use \"task.ext.prefix\" to disambiguate!")
+-    }
++    def stats   = save_clipstats   ? "-f ${prefix}.clipstats.txt"               : ""
 +    if ("$bam" == "${prefix}.clipallowed.bam") error "Input and output names are the same, use \"task.ext.prefix\" to disambiguate!"
      """
+-    # Note: --threads value represents *additional* CPUs to allocate (total CPUs = 1 + --threads).
      samtools \\
          ampliconclip \\
-@@ -44,4 +43,23 @@
-         samtools: \$(echo \$(samtools --version 2>&1) | sed 's/^.*samtools //; s/Using.*\$//')
-     END_VERSIONS
-     """
+-        --threads ${task.cpus - 1} \\
+-        ${args} \\
+-        ${rejects} \\
+-        ${stats} \\
+-        -b ${bed} \\
++        --threads ${task.cpus-1} \\
++        $args \\
++        $rejects \\
++        $stats \\
++        -b $bed \\
+         -o ${prefix}.clipallowed.bam \\
+-        ${bam}
++        $bam
 +
-+    stub:
-+    def prefix = task.ext.prefix ?: "${meta.id}"
++    cat <<-END_VERSIONS > versions.yml
++    "${task.process}":
++        samtools: \$(echo \$(samtools --version 2>&1) | sed 's/^.*samtools //; s/Using.*\$//')
++    END_VERSIONS
+     """
+ 
+     stub:
+-
+     def prefix = task.ext.prefix ?: "${meta.id}"
+-    def rejects = save_cliprejects ? "touch ${prefix}.cliprejects.bam" : ""
+-    def stats = save_clipstats ? "touch ${prefix}.clipstats.txt" : ""
+-
+-    if ("${bam}" == "${prefix}.bam") {
+-        error("Input and output names are the same, use \"task.ext.prefix\" to disambiguate!")
+-    }
+-
 +    def rejects_file = save_cliprejects ? "${prefix}.cliprejects.bam" : ""
 +    def stats_file = save_clipstats ? "${prefix}.clipstats.txt" : ""
-+    """
-+    touch ${prefix}.clipallowed.bam
+     """
+     touch ${prefix}.clipallowed.bam
+-    ${rejects}
+-    ${stats}
 +    if [[ "$rejects_file" != "" ]]; then
 +        touch $rejects_file
 +    fi
@@ -68,10 +99,9 @@ Changes in 'samtools/ampliconclip/main.nf':
 +    "${task.process}":
 +        samtools: \$(echo \$(samtools --version 2>&1) | sed 's/^.*samtools //; s/Using.*\$//')
 +    END_VERSIONS
-+    """
+     """
  }
 
 'modules/nf-core/samtools/ampliconclip/tests/main.nf.test.snap' is unchanged
-'modules/nf-core/samtools/ampliconclip/tests/tags.yml' is unchanged
 'modules/nf-core/samtools/ampliconclip/tests/main.nf.test' is unchanged
 ************************************************************

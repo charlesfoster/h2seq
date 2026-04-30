@@ -1,9 +1,15 @@
 {
     "sarscov2 - single_end": {
         "content": [
-            [
-                "versions.yml:md5,80eb3d2ad36960c7e9263f81ede9d263"
-            ],
+            {
+                "versions_salmon": [
+                    [
+                        "SALMON_QUANT",
+                        "salmon",
+                        "1.10.3"
+                    ]
+                ]
+            },
             [
                 [
                     {
@@ -15,16 +21,22 @@
             ]
         ],
         "meta": {
-            "nf-test": "0.8.4",
-            "nextflow": "23.10.1"
+            "nf-test": "0.9.3",
+            "nextflow": "25.10.2"
         },
-        "timestamp": "2024-06-14T09:51:22.424672"
+        "timestamp": "2026-01-19T14:53:59.375252"
     },
     "sarscov2 - single_end stub": {
         "content": [
-            [
-                "versions.yml:md5,80eb3d2ad36960c7e9263f81ede9d263"
-            ],
+            {
+                "versions_salmon": [
+                    [
+                        "SALMON_QUANT",
+                        "salmon",
+                        "1.10.3"
+                    ]
+                ]
+            },
             [
                 [
                     {
@@ -36,16 +48,22 @@
             ]
         ],
         "meta": {
-            "nf-test": "0.8.4",
-            "nextflow": "23.10.1"
+            "nf-test": "0.9.3",
+            "nextflow": "25.10.2"
         },
-        "timestamp": "2024-06-14T09:51:32.292277"
+        "timestamp": "2026-01-19T14:54:06.507228"
     },
     "sarscov2 - single_end lib type A": {
         "content": [
-            [
-                "versions.yml:md5,80eb3d2ad36960c7e9263f81ede9d263"
-            ],
+            {
+                "versions_salmon": [
+                    [
+                        "SALMON_QUANT",
+                        "salmon",
+                        "1.10.3"
+                    ]
+                ]
+            },
             [
                 [
                     {
@@ -57,16 +75,22 @@
             ]
         ],
         "meta": {
-            "nf-test": "0.8.4",
-            "nextflow": "23.10.1"
+            "nf-test": "0.9.3",
+            "nextflow": "25.10.2"
         },
-        "timestamp": "2024-06-14T09:51:42.656382"
+        "timestamp": "2026-01-19T14:54:15.005117"
     },
     "sarscov2 - pair_end multiple": {
         "content": [
-            [
-                "versions.yml:md5,80eb3d2ad36960c7e9263f81ede9d263"
-            ],
+            {
+                "versions_salmon": [
+                    [
+                        "SALMON_QUANT",
+                        "salmon",
+                        "1.10.3"
+                    ]
+                ]
+            },
             [
                 [
                     {
@@ -78,16 +102,22 @@
             ]
         ],
         "meta": {
-            "nf-test": "0.8.4",
-            "nextflow": "23.10.1"
+            "nf-test": "0.9.3",
+            "nextflow": "25.10.2"
         },
-        "timestamp": "2024-06-14T09:52:33.03647"
+        "timestamp": "2026-01-19T14:54:48.338822"
     },
     "sarscov2 - pair_end multiple stub": {
         "content": [
-            [
-                "versions.yml:md5,80eb3d2ad36960c7e9263f81ede9d263"
-            ],
+            {
+                "versions_salmon": [
+                    [
+                        "SALMON_QUANT",
+                        "salmon",
+                        "1.10.3"
+                    ]
+                ]
+            },
             [
                 [
                     {
@@ -99,16 +129,22 @@
             ]
         ],
         "meta": {
-            "nf-test": "0.8.4",
-            "nextflow": "23.10.1"
+            "nf-test": "0.9.3",
+            "nextflow": "25.10.2"
         },
-        "timestamp": "2024-06-14T09:52:43.388379"
+        "timestamp": "2026-01-19T14:54:56.134603"
     },
     "sarscov2 - single_end lib type A stub": {
         "content": [
-            [
-                "versions.yml:md5,80eb3d2ad36960c7e9263f81ede9d263"
-            ],
+            {
+                "versions_salmon": [
+                    [
+                        "SALMON_QUANT",
+                        "salmon",
+                        "1.10.3"
+                    ]
+                ]
+            },
             [
                 [
                     {
@@ -120,16 +156,22 @@
             ]
         ],
         "meta": {
-            "nf-test": "0.8.4",
-            "nextflow": "23.10.1"
+            "nf-test": "0.9.3",
+            "nextflow": "25.10.2"
         },
-        "timestamp": "2024-06-14T09:51:52.612664"
+        "timestamp": "2026-01-19T14:54:22.024404"
     },
     "sarscov2 - pair_end": {
         "content": [
-            [
-                "versions.yml:md5,80eb3d2ad36960c7e9263f81ede9d263"
-            ],
+            {
+                "versions_salmon": [
+                    [
+                        "SALMON_QUANT",
+                        "salmon",
+                        "1.10.3"
+                    ]
+                ]
+            },
             [
                 [
                     {
@@ -141,16 +183,22 @@
             ]
         ],
         "meta": {
-            "nf-test": "0.8.4",
-            "nextflow": "23.10.1"
+            "nf-test": "0.9.3",
+            "nextflow": "25.10.2"
         },
-        "timestamp": "2024-06-14T09:52:05.577881"
+        "timestamp": "2026-01-19T14:54:30.967174"
     },
     "sarscov2 - pair_end stub": {
         "content": [
-            [
-                "versions.yml:md5,80eb3d2ad36960c7e9263f81ede9d263"
-            ],
+            {
+                "versions_salmon": [
+                    [
+                        "SALMON_QUANT",
+                        "salmon",
+                        "1.10.3"
+                    ]
+                ]
+            },
             [
                 [
                     {
@@ -162,9 +210,9 @@
             ]
         ],
         "meta": {
-            "nf-test": "0.8.4",
-            "nextflow": "23.10.1"
+            "nf-test": "0.9.3",
+            "nextflow": "25.10.2"
         },
-        "timestamp": "2024-06-14T09:52:15.286461"
+        "timestamp": "2026-01-19T14:54:38.572004"
     }
 }
