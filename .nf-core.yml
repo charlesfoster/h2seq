@@ -2,6 +2,7 @@ lint:
   nf_test_content: False
   files_exist:
     - CODE_OF_CONDUCT.md
+    - docs/CONTRIBUTING.md
     - assets/nf-core-h2seq_logo_light.png
     - docs/images/nf-core-h2seq_logo_light.png
     - docs/images/nf-core-h2seq_logo_dark.png
@@ -17,6 +18,8 @@ lint:
     - .github/workflows/release-announcements.yml
     - conf/igenomes_ignored.config
     - ro-crate-metadata.json
+    - subworkflows/nf-core/utils_nfcore_pipeline
+    - subworkflows/nf-core/utils_nextflow_pipeline
   files_unchanged:
     - CODE_OF_CONDUCT.md
     - assets/nf-core-h2seq_logo_light.png
