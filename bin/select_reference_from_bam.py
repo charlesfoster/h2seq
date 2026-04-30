@@ -301,7 +301,7 @@ def sort_rows(rows, use_coverage_breadth):
     )
 
 
-def write_ranking(path, sorted_rows, selection_rule):
+def write_ranking(path, sorted_rows, selection_rule, selected_reference_id=None):
     columns = [
         "sample_id",
         "read_type",
@@ -332,7 +332,7 @@ def write_ranking(path, sorted_rows, selection_rule):
             output_row["mean_mapq"] = fmt_float(row["mean_mapq"])
             output_row["reference_coverage_breadth"] = fmt_float(row["reference_coverage_breadth"])
             output_row["selection_rank"] = rank
-            output_row["selected"] = "true" if rank == 1 else "false"
+            output_row["selected"] = "true" if row["reference_id"] == selected_reference_id else "false"
             output_row["selection_rule"] = selection_rule
             writer.writerow(output_row)
 
@@ -375,6 +375,8 @@ def write_compatible_outputs(args, sorted_rows, selection_rule):
         "mean_mapq",
         "covered_reference_bases",
         "reference_coverage_breadth",
+        "selection_status",
+        "qc_fail_reason",
     ]
 
     with open(args.output, "w", newline="", encoding="utf-8") as handle:
@@ -399,6 +401,65 @@ def write_compatible_outputs(args, sorted_rows, selection_rule):
                 "mean_mapq": fmt_float(winner["mean_mapq"]),
                 "covered_reference_bases": winner["covered_reference_bases"],
                 "reference_coverage_breadth": fmt_float(winner["reference_coverage_breadth"]),
+                "selection_status": "pass",
+                "qc_fail_reason": "",
+            }
+        )
+
+
+def write_qc_fail_outputs(args, sorted_rows, selection_rule, reason):
+    with open(args.best_ref_txt, "w", encoding="utf-8"):
+        pass
+
+    with open(args.alternate_subtype_txt, "w", encoding="utf-8"):
+        pass
+
+    columns = [
+        "sample_id",
+        "genotype",
+        "subtype",
+        "best_ref",
+        "close_hits",
+        "other_potential_subtypes",
+        "selection_method",
+        "selection_rule",
+        "reference_length",
+        "mapped_reads",
+        "mapped_bases",
+        "aligned_bases",
+        "aligned_fraction",
+        "mean_identity",
+        "mean_mapq",
+        "covered_reference_bases",
+        "reference_coverage_breadth",
+        "selection_status",
+        "qc_fail_reason",
+    ]
+
+    with open(args.output, "w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns, delimiter="\t")
+        writer.writeheader()
+        writer.writerow(
+            {
+                "sample_id": args.sample_name,
+                "genotype": "",
+                "subtype": "",
+                "best_ref": "",
+                "close_hits": "",
+                "other_potential_subtypes": "",
+                "selection_method": "minimap2_competitive_bam",
+                "selection_rule": selection_rule,
+                "reference_length": "",
+                "mapped_reads": 0,
+                "mapped_bases": 0,
+                "aligned_bases": 0,
+                "aligned_fraction": "",
+                "mean_identity": "",
+                "mean_mapq": "",
+                "covered_reference_bases": 0,
+                "reference_coverage_breadth": "",
+                "selection_status": "qc_fail",
+                "qc_fail_reason": reason,
             }
         )
 
@@ -408,12 +469,6 @@ def main():
     stats = load_alignment_stats(args.primary_sam, args.panel_fasta)
     rows = summarize_rows(args, stats)
 
-    if not rows:
-        raise SystemExit(f"No references were found in {args.primary_sam} or {args.panel_fasta}.")
-    if not any(row["mapped_reads"] > 0 for row in rows):
-        raise SystemExit(f"No primary mapped reads were found in {args.bam} for sample {args.sample_name}.")
-
-    sorted_rows = sort_rows(rows, args.use_coverage_breadth)
     if args.use_coverage_breadth:
         selection_rule = (
             "aligned_bases desc; reference_coverage_breadth desc; mapped_bases desc; "
@@ -425,7 +480,18 @@ def main():
             "mean_identity desc; mean_mapq desc; reference_id asc"
         )
 
-    write_ranking(args.ranking_output, sorted_rows, selection_rule)
+    if not rows:
+        write_ranking(args.ranking_output, [], selection_rule)
+        write_qc_fail_outputs(args, [], selection_rule, "no_references_in_panel")
+        return
+
+    sorted_rows = sort_rows(rows, args.use_coverage_breadth)
+    if not any(row["mapped_reads"] > 0 for row in rows):
+        write_ranking(args.ranking_output, sorted_rows, selection_rule)
+        write_qc_fail_outputs(args, sorted_rows, selection_rule, "no_primary_mapped_reads")
+        return
+
+    write_ranking(args.ranking_output, sorted_rows, selection_rule, sorted_rows[0]["reference_id"])
     write_compatible_outputs(args, sorted_rows, selection_rule)
 
 

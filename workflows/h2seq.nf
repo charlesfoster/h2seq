@@ -445,7 +445,9 @@ workflow H2SEQ {
             )
             ch_best_ref_tsv = SELECT_REFERENCE_FROM_BAM.out.best_ref_tsv
             ch_best_ref_txt = SELECT_REFERENCE_FROM_BAM.out.best_ref_txt
+                .filter { _meta, txt -> txt.text.trim() }
             ch_alt_ref_txt = SELECT_REFERENCE_FROM_BAM.out.alt_ref_txt
+                .filter { _meta, txt -> txt.text.trim() }
             ch_versions = ch_versions.mix(SELECT_REFERENCE_FROM_BAM.out.versions)
         }
 

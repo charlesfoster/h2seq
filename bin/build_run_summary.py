@@ -50,6 +50,8 @@ def ensure_row(rows, sample_id, read_type):
             "mean_depth": "",
             "total_reads": "",
             "reads_passing_qc": "",
+            "qc_status": "",
+            "qc_fail_reason": "",
             "pipeline_version": "",
             "analysis_date": "",
         }
@@ -103,6 +105,8 @@ def main():
             row["designated_genotype"] = record.get("genotype", "")
             row["designated_subtype"] = record.get("subtype", "")
             row["selected_reference"] = record.get("best_ref", row["selected_reference"])
+            row["qc_status"] = record.get("selection_status", row["qc_status"])
+            row["qc_fail_reason"] = record.get("qc_fail_reason", row["qc_fail_reason"])
 
     for path in sorted(outdir.rglob("*.fastp.json")):
         sample_id, read_type = infer_sample_and_read_type(path)
@@ -151,6 +155,8 @@ def main():
         "mean_depth",
         "total_reads",
         "reads_passing_qc",
+        "qc_status",
+        "qc_fail_reason",
         "pipeline_version",
         "analysis_date",
     ]
@@ -173,6 +179,8 @@ def main():
             "mean_depth": {"title": "Mean Depth", "format": "{:,.2f}"},
             "total_reads": {"title": "Reads Analysed"},
             "reads_passing_qc": {"title": "Reads Passing QC"},
+            "qc_status": {"title": "QC Status"},
+            "qc_fail_reason": {"title": "QC Fail Reason"},
             "pipeline_version": {"title": "Pipeline Version"},
             "analysis_date": {"title": "Analysis Date"},
         }
