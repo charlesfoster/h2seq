@@ -3,6 +3,18 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.3.0 - [2026-04-30]
+
+### `Added`
+
+- Added minimap2 competitive reference selection as the default reference-selection method
+- Added sample-level QC failure reasons for missing primary mapped reads, low selected-reference coverage, and consensus genomes that are insufficient for HCV-GLUE reporting
+- Added run-summary reporting to mark genotype/subtype assignments as unreliable for QC-failed samples
+
+### `Changed`
+
+- Raised the minimum supported Nextflow version to `26.04.0`
+
 ## v0.2.0 - [2026-03-24]
 
 ### `Added`

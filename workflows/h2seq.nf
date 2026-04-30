@@ -814,6 +814,7 @@ workflow H2SEQ {
         REMOVE_EMPTY_SEQUENCES (
             ch_split_consensuses
         )
+        ch_versions = ch_versions.mix(REMOVE_EMPTY_SEQUENCES.out.versions)
 
         // Handy hint: transpose operator “transposes” each tuple from a source channel
         //      by flattening any nested list in each tuple, emitting each nested item separately.
@@ -982,6 +983,7 @@ workflow H2SEQ {
         .mix(RENDER_SUMMARY_REPORT.out.pdf)
     if (params.virus_preset == "hcv" && params.run_hcv_glue) {
         ch_summary_triggers = ch_summary_triggers
+            .mix(REMOVE_EMPTY_SEQUENCES.out.empty_fasta)
             .mix(PARSE_HCV_GLUE_COVERAGE.out.tsv)
             .mix(PLOT_HCV_SUMMARY.out.feature)
             .mix(RENDER_HCV_REPORT.out.pdf)

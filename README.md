@@ -3,7 +3,7 @@
 [![nf-test](https://img.shields.io/badge/unit_tests-nf--test-337ab7.svg)](https://www.nf-test.com)
 [![nf-core template](https://img.shields.io/badge/nf--core%20template-3.5.2-%2304B7B4?logo=nf-core&logoColor=white)](https://nf-co.re/)
 
-[![Nextflow](https://img.shields.io/badge/version-%E2%89%A523.10.0-green?style=flat&logo=nextflow&logoColor=white&color=%230DC09D&link=https%3A%2F%2Fnextflow.io)](https://www.nextflow.io/)
+[![Nextflow](https://img.shields.io/badge/version-%E2%89%A526.04.0-green?style=flat&logo=nextflow&logoColor=white&color=%230DC09D&link=https%3A%2F%2Fnextflow.io)](https://www.nextflow.io/)
 [![run with conda](http://img.shields.io/badge/run%20with-conda-3EB049?labelColor=000000&logo=anaconda)](https://docs.conda.io/en/latest/)
 [![run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?labelColor=000000&logo=docker)](https://www.docker.com/)
 [![run with singularity](https://img.shields.io/badge/run%20with-singularity-1d355c.svg?labelColor=000000)](https://sylabs.io/docs/)
@@ -71,6 +71,7 @@ The current workflow uses the following primary tools:
 #### Coverage, reporting, and HCV-specific outputs
 
 - Coverage is calculated with `mosdepth`, and the pipeline produces depth summaries, mapped-read counts, and per-sample coverage metrics.
+- Samples with no primary mapped reads, low selected-reference coverage, or an all-`N` main consensus before HCV-GLUE are retained in the combined summary as `qc_fail`; genotype/subtype assignments for those rows are flagged as unreliable.
 - Custom summary tables and plots are generated for integration into `MultiQC`.
 - When enabled, the optional `HCV-GLUE` integration adds HCV-specific reporting and genomic-region coverage summaries for final consensus genomes.
 

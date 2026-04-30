@@ -113,7 +113,7 @@ Contains:
 - HCV-GLUE report path
 - notes describing skipped or failed sample-level outcomes
 
-Rows are emitted even for samples that stop early because they have no usable reads.
+Rows are emitted even for samples that stop early because they have no usable reads. Samples are marked `qc_fail` when they have no primary mapped reads, when less than `--qc_min_ref_coverage_pct` of the selected reference is covered at `--consensus_min_depth`, or when the main consensus is all `N` and cannot be sent to HCV-GLUE. Genotype/subtype calls for QC-failed samples are blanked in the combined summary and flagged as unreliable.
 
 ### `all_consensus_genomes/`
 

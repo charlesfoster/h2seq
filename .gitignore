@@ -10,3 +10,4 @@ null/
 .vscode/
 .mplconfig/
 .cache/
+lint_results.*

@@ -24,6 +24,7 @@ process BUILD_RUN_SUMMARY {
     python3 ${projectDir}/bin/build_run_summary.py \\
         --outdir "${outdir}" \\
         --pipeline-version "${pipeline_version}" \\
+        --min-reference-coverage-pct ${params.qc_min_ref_coverage_pct} \\
         --output combined_results_summary.csv \\
         --multiqc-output combined_results_summary_mqc.json
     """

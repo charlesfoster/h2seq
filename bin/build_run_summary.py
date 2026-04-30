@@ -10,6 +10,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Build a run-level sample summary CSV.")
     parser.add_argument("--outdir", required=True)
     parser.add_argument("--pipeline-version", default="")
+    parser.add_argument("--min-reference-coverage-pct", type=float, default=50.0)
     parser.add_argument("--output", required=True)
     parser.add_argument("--multiqc-output")
     return parser.parse_args()
@@ -52,6 +53,7 @@ def ensure_row(rows, sample_id, read_type):
             "reads_passing_qc": "",
             "qc_status": "",
             "qc_fail_reason": "",
+            "genotype_subtype_status": "",
             "pipeline_version": "",
             "analysis_date": "",
         }
@@ -77,6 +79,39 @@ def extract_seqkit_count(records, path):
         raise ValueError(f"Inconsistent num_seqs values in {path}: {counts}")
 
     return counts[0]
+
+
+def to_float(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def add_qc_fail(row, reason):
+    reasons = [item for item in row.get("qc_fail_reason", "").split(";") if item]
+    if reason not in reasons:
+        reasons.append(reason)
+    row["qc_status"] = "qc_fail"
+    row["qc_fail_reason"] = ";".join(reasons)
+
+
+def finalize_qc(rows, min_reference_coverage_pct):
+    for row in rows.values():
+        coverage_pct = to_float(row.get("genome_coverage"))
+        if coverage_pct is not None and coverage_pct < min_reference_coverage_pct:
+            add_qc_fail(row, "low_ref_coverage")
+
+        if row.get("qc_status") == "qc_fail":
+            row["genotype_subtype_status"] = "unreliable_qc_fail"
+            row["designated_genotype"] = ""
+            row["designated_subtype"] = ""
+        elif row.get("designated_genotype") or row.get("designated_subtype"):
+            row["qc_status"] = row.get("qc_status") or "pass"
+            row["genotype_subtype_status"] = "assigned"
+        else:
+            row["qc_status"] = row.get("qc_status") or ""
+            row["genotype_subtype_status"] = ""
 
 
 def main():
@@ -107,6 +142,13 @@ def main():
             row["selected_reference"] = record.get("best_ref", row["selected_reference"])
             row["qc_status"] = record.get("selection_status", row["qc_status"])
             row["qc_fail_reason"] = record.get("qc_fail_reason", row["qc_fail_reason"])
+
+    for path in sorted(outdir.rglob("*.empty.fasta")):
+        if "consensus_main.empty.fasta" not in path.name:
+            continue
+        sample_id, read_type = infer_sample_and_read_type(path)
+        row = ensure_row(rows, sample_id, read_type)
+        add_qc_fail(row, "genome_insufficient_for_hcv-glue")
 
     for path in sorted(outdir.rglob("*.fastp.json")):
         sample_id, read_type = infer_sample_and_read_type(path)
@@ -139,6 +181,8 @@ def main():
         elif ".clean_long." in name or ".clean_short." in name:
             row["reads_passing_qc"] = count
 
+    finalize_qc(rows, args.min_reference_coverage_pct)
+
     for row in rows.values():
         row["pipeline_version"] = args.pipeline_version
         row["analysis_date"] = date.today().isoformat()
@@ -157,6 +201,7 @@ def main():
         "reads_passing_qc",
         "qc_status",
         "qc_fail_reason",
+        "genotype_subtype_status",
         "pipeline_version",
         "analysis_date",
     ]
@@ -181,6 +226,7 @@ def main():
             "reads_passing_qc": {"title": "Reads Passing QC"},
             "qc_status": {"title": "QC Status"},
             "qc_fail_reason": {"title": "QC Fail Reason"},
+            "genotype_subtype_status": {"title": "Genotype/Subtype Status"},
             "pipeline_version": {"title": "Pipeline Version"},
             "analysis_date": {"title": "Analysis Date"},
         }
