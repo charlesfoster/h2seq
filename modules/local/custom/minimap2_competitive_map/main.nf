@@ -49,8 +49,8 @@ process MINIMAP2_COMPETITIVE_MAP {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        minimap2: \$(minimap2 --version 2>&1)
-        samtools: \$(echo \$(samtools --version 2>&1) | sed 's/^.*samtools //; s/Using.*\$//')
+        minimap2: stub
+        samtools: stub
     END_VERSIONS
     """
 }

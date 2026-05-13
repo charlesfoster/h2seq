@@ -8,7 +8,7 @@ process RENDER_HCV_REPORT {
         'quay.io/biocontainers/longqc:1.2.0c--hdfd78af_0' }"
 
     input:
-    tuple val(meta), path(best_reference_tsv), path(coverage_summary), path(depth_plot), path(feature_plot)
+    tuple val(meta), path(best_reference_tsv), path(coverage_summary), path(depth_plot), path(feature_plot), path(hcv_coverage)
     path logo
     val pipeline_version
 
@@ -33,6 +33,7 @@ process RENDER_HCV_REPORT {
         --coverage-summary ${coverage_summary} \\
         --depth-plot ${depth_plot} \\
         --feature-plot ${feature_plot} \\
+        --hcv-coverage ${hcv_coverage} \\
         --include-feature-plot \\
         --logo ${logo} \\
         --pipeline-version "${pipeline_version}" \\

@@ -8,23 +8,30 @@ process BCFTOOLS_CONSENSUS {
         'quay.io/biocontainers/bcftools:1.20--h8b25389_0' }"
 
     input:
-    tuple val(meta), path(vcf), path(vcf_idx), path(fasta), path(mask_bed)
+    tuple val(meta), path(vcf), path(vcf_idx), path(fasta), path(mask_bed), path(simple_vcf), path(simple_vcf_idx)
 
     output:
-    tuple val(meta), path("*.consensus.fa"), emit: fasta
-    path "versions.yml"                     , emit: versions
+    tuple val(meta), path("*.consensus.fa")              , emit: fasta
+    tuple val(meta), path("*.consensus_simple.fa")       , emit: simple_fasta
+    path "versions.yml"                                   , emit: versions
 
     script:
     def prefix = task.ext.prefix ?: "${meta.id}"
-    def haplotypeArg = params.majority_allele_consensus ? '' : "        -H I \\\n"
     def headerLabel = meta.reference_name ? "${prefix} ${meta.reference_name}" : prefix
     """
     bcftools consensus \\
         -f $fasta \\
         -m $mask_bed \\
         --mark-del '-' \\
-${haplotypeArg}        \
+        -H I \\
         $vcf | sed "/^>/s/.*/>${headerLabel}/" > ${prefix}.consensus.fa
+
+    bcftools consensus \\
+        -f $fasta \\
+        -m $mask_bed \\
+        --mark-del '-' \\
+        -H 1 \\
+        $simple_vcf | sed "/^>/s/.*/>${headerLabel}/" > ${prefix}.consensus_simple.fa
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -36,6 +43,7 @@ ${haplotypeArg}        \
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
     printf ">${prefix}\\nNNNN\\n" > ${prefix}.consensus.fa
+    printf ">${prefix}\\nNNNN\\n" > ${prefix}.consensus_simple.fa
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

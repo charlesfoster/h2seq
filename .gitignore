@@ -11,3 +11,4 @@ null/
 .mplconfig/
 .cache/
 lint_results.*
+lint.md
