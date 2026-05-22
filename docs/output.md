@@ -68,7 +68,8 @@ Typical contents:
 
 Typical contents:
 
-- split consensus FASTA files such as `*.consensus_main.fa`
+- split IUPAC consensus FASTA files such as `*.consensus_main.fa`
+- split simple majority-allele consensus FASTA files such as `*.simple.consensus_main.fa`
 - alternate consensus FASTA files when multiple candidate references are retained
 - mapped BAM/CSI files when `--save_mapped_bam` is enabled
 
@@ -76,7 +77,7 @@ Typical contents:
 
 Contains intermediate and final files from the variant-calling and consensus workflow.
 
-If `--majority_allele_consensus` is enabled, the final consensus contains no IUPAC ambiguity codes. In that mode, only majority variants with allele frequency `>= 0.5` are incorporated into the consensus, regardless of lower user-supplied SNV or indel thresholds.
+The workflow always builds both an IUPAC ambiguity consensus and a simple majority-allele consensus. The simple consensus incorporates variants with allele frequency `>= 0.5` and is used for downstream reporting steps such as HCV-GLUE.
 
 ### `reporting`
 

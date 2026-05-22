@@ -37,7 +37,7 @@ process MINIMAP2_REFERENCE_INDEX {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        minimap2: \$(minimap2 --version 2>&1)
+        minimap2: stub
     END_VERSIONS
     """
 }

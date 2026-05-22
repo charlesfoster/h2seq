@@ -401,11 +401,11 @@
                 },
                 "majority_allele_consensus": {
                     "type": "boolean",
-                    "description": "Generate a majority-allele consensus with no IUPAC ambiguity codes.",
+                    "description": "Deprecated. The pipeline now always generates both IUPAC and simple majority-allele consensuses.",
                     "default": false,
                     "fa_icon": "fas fa-dna",
-                    "hidden": false,
-                    "help_text": "If enabled, only majority variants with allele frequency >= 0.5 are incorporated into the consensus and heterozygous/IUPAC calls are disabled."
+                    "hidden": true,
+                    "help_text": "Deprecated: both IUPAC and simple majority-allele consensuses are always generated. The simple consensus is used for downstream analyses (e.g. HCV-GLUE)."
                 },
                 "ont_variant_min_qual": {
                     "type": "number",

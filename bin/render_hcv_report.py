@@ -16,6 +16,7 @@ def parse_args():
     parser.add_argument("--coverage-summary", required=True)
     parser.add_argument("--depth-plot", required=True)
     parser.add_argument("--feature-plot")
+    parser.add_argument("--hcv-coverage")
     parser.add_argument("--include-feature-plot", action="store_true")
     parser.add_argument("--logo", required=True)
     parser.add_argument("--pipeline-version", required=True)
@@ -39,7 +40,19 @@ def read_single_tsv_row(path):
     return rows[0]
 
 
-def build_summary_sentence(args):
+def hcv_coverage_is_empty(path):
+    if not path:
+        return False
+    with open(path, newline="") as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        values = {
+            row.get("feature", ""): (row.get("coverage_pct") or "").strip()
+            for row in reader
+        }
+    return all(values.get(feature, "") == "" for feature in ["Core", "E1", "E2", "NS3", "NS5B"])
+
+
+def build_summary_sentence(args, coverage_is_missing=False):
     snv_af_pct = float(args.snv_min_af) * 100.0
     indel_af_pct = float(args.indel_min_af) * 100.0
     if args.read_type == "long":
@@ -53,16 +66,18 @@ def build_summary_sentence(args):
             f"including a minimum read length of {args.short_reads_min_len} bases."
         )
     version = args.pipeline_version or "unknown"
+    if coverage_is_missing:
+        coverage_note = "Coding-region coverage information could not be determined from the HCV-GLUE output."
+    elif args.include_feature_plot:
+        coverage_note = "Coding-region coverage metrics were taken from a downstream resistance-analysis report."
+    else:
+        coverage_note = "A per-gene HCV coverage panel was not included because no HCV-GLUE result was available for this sample."
     return (
         f"{args.sample_id} was analysed on {date.today().isoformat()} using version v{version} of the H2seq bioinformatics pipeline. "
         f"{qc_description} A closest reference was selected from the configured reference panel based on a read mapping approach, "
         f"reads were aligned to that reference, SNVs were retained from a minimum depth of {args.consensus_min_depth} and minimum allele frequency of {snv_af_pct:.1f}%, "
         f"indels were retained using a minimum allele frequency of {indel_af_pct:.1f}%, and a consensus genome was assembled using a minimum consensus depth of {args.consensus_min_depth}. "
-        + (
-            "Coding-region coverage metrics were taken from a downstream resistance-analysis report."
-            if args.include_feature_plot
-            else "A per-gene HCV coverage panel was not included because no HCV-GLUE result was available for this sample."
-        )
+        + coverage_note
     )
 
 
@@ -70,10 +85,11 @@ def main():
     args = parse_args()
     best_ref = read_single_tsv_row(args.best_reference_tsv)
     coverage = read_single_tsv_row(args.coverage_summary)
+    coverage_is_missing = hcv_coverage_is_empty(args.hcv_coverage)
     logo = mpimg.imread(args.logo)
     depth_plot = mpimg.imread(args.depth_plot)
     feature_plot = mpimg.imread(args.feature_plot) if args.include_feature_plot and args.feature_plot else None
-    summary_sentence = build_summary_sentence(args)
+    summary_sentence = build_summary_sentence(args, coverage_is_missing=coverage_is_missing)
 
     fig = plt.figure(figsize=(8.27, 11.69), dpi=200)
     gs = fig.add_gridspec(nrows=28, ncols=12, left=0.05, right=0.95, top=0.97, bottom=0.04, hspace=0.45, wspace=0.4)

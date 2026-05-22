@@ -35,7 +35,7 @@ def parse_args():
 def extract_feature_table(html_text):
     match = re.search(r'<table id="featureCoverageTable">(.*?)</table>', html_text, re.IGNORECASE | re.DOTALL)
     if not match:
-        raise ValueError("Could not find featureCoverageTable in HCV-GLUE HTML")
+        return {}
     table_html = match.group(1)
     rows = re.findall(r"<tr>(.*?)</tr>", table_html, re.IGNORECASE | re.DOTALL)
     coverage = {}

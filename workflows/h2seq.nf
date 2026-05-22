@@ -719,10 +719,15 @@ workflow H2SEQ {
     )
     ch_versions = ch_versions.mix(CREATE_CONSENSUS_MASK.out.versions)
 
+    FILTER_VARIANTS.out.simple_vcf.map { meta, simple_vcf, simple_vcf_idx ->
+        [meta.id, meta.long_reads, meta, simple_vcf, simple_vcf_idx]
+    }.set { ch_simple_vcf_input }
+
     ch_bcftools_consensus_input = FILTER_VARIANTS.out.vcf
         .map { meta, vcf, vcf_idx ->
             [meta.id, meta.long_reads, meta, vcf, vcf_idx]
         }
+        .combine(ch_simple_vcf_input, by: [0, 1])
         .combine(
             ch_reference_fai.map { _id, _long_reads, meta, fasta, _fai ->
                 [meta.id, meta.long_reads, meta, fasta]
@@ -735,8 +740,8 @@ workflow H2SEQ {
             },
             by: [0, 1]
         )
-        .map { _id, _long_reads, meta, vcf, vcf_idx, refMeta, fasta, _meta3, mask_bed ->
-            [meta + [reference_name: refMeta.reference_name], vcf, vcf_idx, fasta, mask_bed]
+        .map { _id, _long_reads, meta, vcf, vcf_idx, _meta2, simple_vcf, simple_vcf_idx, refMeta, fasta, _meta3, mask_bed ->
+            [meta + [reference_name: refMeta.reference_name], vcf, vcf_idx, fasta, mask_bed, simple_vcf, simple_vcf_idx]
         }
 
     BCFTOOLS_CONSENSUS (
@@ -745,6 +750,11 @@ workflow H2SEQ {
     ch_versions = ch_versions.mix(BCFTOOLS_CONSENSUS.out.versions)
 
     ch_consensus_fa = BCFTOOLS_CONSENSUS.out.fasta
+        .map { meta, fasta ->
+            return [meta.id, meta.long_reads, meta, fasta]
+        }
+
+    ch_simple_consensus_fa = BCFTOOLS_CONSENSUS.out.simple_fasta
         .map { meta, fasta ->
             return [meta.id, meta.long_reads, meta, fasta]
         }
@@ -761,7 +771,13 @@ workflow H2SEQ {
         ch_split_input = ch_consensus_fa
             .combine(ch_best_ref_txt_keyed, by:[0,1])
             .map {_id, _is_long, meta, fasta, _meta2, txt ->
-                [meta, fasta, txt]
+                [meta + [consensus_type: "iupac"], fasta, txt]
+            }
+
+        ch_simple_split_input = ch_simple_consensus_fa
+            .combine(ch_best_ref_txt_keyed, by:[0,1])
+            .map {_id, _is_long, meta, fasta, _meta2, txt ->
+                [meta + [consensus_type: "simple"], fasta, txt]
             }
 
         // split potential multiple consensuses into individual files
@@ -769,10 +785,13 @@ workflow H2SEQ {
         // the others will be in "*.alt#.fa" (e.g. alt1, alt2, ...)
 
         SPLIT_CONSENSUS_GENOMES (
-            ch_split_input
+            ch_split_input.mix(ch_simple_split_input)
         )
 
         ch_split_consensuses = SPLIT_CONSENSUS_GENOMES.out.fastas
+            .filter { meta, _fasta -> meta.consensus_type == "iupac" }
+        ch_simple_split_consensuses = SPLIT_CONSENSUS_GENOMES.out.fastas
+            .filter { meta, _fasta -> meta.consensus_type == "simple" }
     } else {
         // When reference selection is skipped, still run SPLIT_CONSENSUS_GENOMES
         // First create pattern files from the reference FASTA
@@ -789,7 +808,16 @@ workflow H2SEQ {
         // Create pattern files for each sample
         ch_sample_patterns = ch_consensus_fa
             .map { meta_id, meta_long_reads, meta, fasta ->
-                return [meta, fasta]
+                return [meta + [consensus_type: "iupac"], fasta]
+            }
+            .combine(CREATE_PATTERN_FILE.out.pattern)
+            .map { sample_meta, consensus_fasta, pattern_meta, pattern_file ->
+                return [sample_meta, consensus_fasta, pattern_file]
+            }
+
+        ch_simple_sample_patterns = ch_simple_consensus_fa
+            .map { meta_id, meta_long_reads, meta, fasta ->
+                return [meta + [consensus_type: "simple"], fasta]
             }
             .combine(CREATE_PATTERN_FILE.out.pattern)
             .map { sample_meta, consensus_fasta, pattern_meta, pattern_file ->
@@ -797,10 +825,13 @@ workflow H2SEQ {
             }
 
         SPLIT_CONSENSUS_GENOMES (
-            ch_sample_patterns
+            ch_sample_patterns.mix(ch_simple_sample_patterns)
         )
 
         ch_split_consensuses = SPLIT_CONSENSUS_GENOMES.out.fastas
+            .filter { meta, _fasta -> meta.consensus_type == "iupac" }
+        ch_simple_split_consensuses = SPLIT_CONSENSUS_GENOMES.out.fastas
+            .filter { meta, _fasta -> meta.consensus_type == "simple" }
     }
 
     /*
@@ -812,11 +843,11 @@ workflow H2SEQ {
     if ( params.run_hcv_glue ){
 
         REMOVE_EMPTY_SEQUENCES (
-            ch_split_consensuses
+            ch_simple_split_consensuses
         )
         ch_versions = ch_versions.mix(REMOVE_EMPTY_SEQUENCES.out.versions)
 
-        // Handy hint: transpose operator “transposes” each tuple from a source channel
+        // Handy hint: transpose operator "transposes" each tuple from a source channel
         //      by flattening any nested list in each tuple, emitting each nested item separately.
         // Practical example: if the channel has [[meta], fasta1, fasta2], then transpose will lead
         //      to [[[meta], fasta1], [[meta],fasta2]]
@@ -901,37 +932,48 @@ workflow H2SEQ {
         }
 
     if (params.virus_preset == "hcv" && params.run_hcv_glue) {
+        ch_hcv_report_features = PLOT_HCV_SUMMARY.out.feature
+            .map { meta, feature_plot ->
+                [meta.id, meta.long_reads, meta, feature_plot]
+            }
+            .combine(
+                PARSE_HCV_GLUE_COVERAGE.out.tsv.map { meta, hcv_tsv ->
+                    [meta.id, meta.long_reads, meta, hcv_tsv]
+                },
+                by: [0, 1]
+            )
+            .map { id, long_reads, _meta, feature_plot, _meta2, hcv_tsv ->
+                [[id, long_reads], null, [feature_plot, hcv_tsv]]
+            }
+
         ch_report_grouped = ch_report_base
             .map { id, long_reads, meta, best_ref_tsv, summary, depth_plot ->
                 [[id, long_reads], [meta, best_ref_tsv, summary, depth_plot], null]
             }
-            .mix(
-                PLOT_HCV_SUMMARY.out.feature.map { meta, feature_plot ->
-                    [[meta.id, meta.long_reads], null, feature_plot]
-                }
-            )
+            .mix(ch_hcv_report_features)
             .groupTuple()
 
         ch_report_input_with_feature = ch_report_grouped
-            .map { _key, payloads, feature_plots ->
+            .map { _key, payloads, feature_payloads ->
                 def payload = payloads.find { it != null }
-                def featurePlot = feature_plots.find { it != null }
-                [payload, featurePlot]
+                def featurePayload = feature_payloads.find { it != null }
+                [payload, featurePayload]
             }
-            .filter { payload, featurePlot -> payload != null && featurePlot != null }
-            .map { payload, featurePlot ->
+            .filter { payload, featurePayload -> payload != null && featurePayload != null }
+            .map { payload, featurePayload ->
                 def (meta, best_ref_tsv, summary, depth_plot) = payload
-                [meta, best_ref_tsv, summary, depth_plot, featurePlot]
+                def (featurePlot, hcvTsv) = featurePayload
+                [meta, best_ref_tsv, summary, depth_plot, featurePlot, hcvTsv]
             }
 
         ch_report_input_without_feature = ch_report_grouped
-            .map { _key, payloads, feature_plots ->
+            .map { _key, payloads, feature_payloads ->
                 def payload = payloads.find { it != null }
-                def featurePlot = feature_plots.find { it != null }
-                [payload, featurePlot]
+                def featurePayload = feature_payloads.find { it != null }
+                [payload, featurePayload]
             }
-            .filter { payload, featurePlot -> payload != null && featurePlot == null }
-            .map { payload, _featurePlot ->
+            .filter { payload, featurePayload -> payload != null && featurePayload == null }
+            .map { payload, _featurePayload ->
                 def (meta, best_ref_tsv, summary, depth_plot) = payload
                 [meta, best_ref_tsv, summary, depth_plot]
             }
@@ -968,6 +1010,7 @@ workflow H2SEQ {
 
     ch_summary_triggers = COVERAGE_METRICS.out.summary
         .mix(ch_split_consensuses)
+        .mix(ch_simple_split_consensuses)
         .mix(ch_hcv_reports)
         .mix(NANOQ.out.stats)
         .mix(FASTP.out.json)
