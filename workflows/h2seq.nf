@@ -36,7 +36,7 @@ include { BWA_MEM as MAP_PRIMERS                  } from '../modules/nf-core/bwa
 include { BWA_MEM                                 } from '../modules/nf-core/bwa/mem/main'
 include { SEQKIT_GREP                             } from '../modules/nf-core/seqkit/grep/main'
 include { BEDTOOLS_BAMTOBED                       } from '../modules/nf-core/bedtools/bamtobed/main'
-include { SAMTOOLS_FAIDX                          } from '../modules/nf-core/samtools/faidx/main'
+include { SAMTOOLS_FAIDX as SAMTOOLS_FAIDX_DRAFT  } from '../modules/nf-core/samtools/faidx/main'
 
 // local modules //
 include { CALCULATE_READ_STATS      } from '../modules/local/custom/calculate_read_stats/main'
@@ -64,6 +64,7 @@ include { ANNOTATE_VARIANTS         } from '../modules/local/custom/annotate_var
 include { CREATE_CONSENSUS_MASK     } from '../modules/local/custom/create_consensus_mask/main'
 include { BCFTOOLS_CONSENSUS        } from '../modules/local/custom/bcftools_consensus/main'
 include { CLAIR3                    } from '../modules/local/custom/clair3/main'
+include { SAMTOOLS_CONSENSUS        } from '../modules/local/custom/samtools_consensus/main'
 include { PARSE_HCV_GLUE_COVERAGE   } from '../modules/local/custom/parse_hcv_glue_coverage/main'
 include { PLOT_HCV_SUMMARY          } from '../modules/local/custom/plot_hcv_summary/main'
 include { PLOT_DEPTH_SUMMARY        } from '../modules/local/custom/plot_depth_summary/main'
@@ -71,8 +72,10 @@ include { RENDER_HCV_REPORT         } from '../modules/local/custom/render_hcv_r
 include { RENDER_SUMMARY_REPORT     } from '../modules/local/custom/render_summary_report/main'
 
 // local subworkflows //
-include { LONG_READ_MAPPING        } from '../subworkflows/local/long_read_mapping'
-include { SHORT_READ_MAPPING       } from '../subworkflows/local/short_read_mapping'
+include { LONG_READ_MAPPING                              } from '../subworkflows/local/long_read_mapping'
+include { LONG_READ_MAPPING as LONG_READ_MAPPING_R2      } from '../subworkflows/local/long_read_mapping'
+include { SHORT_READ_MAPPING                             } from '../subworkflows/local/short_read_mapping'
+include { SHORT_READ_MAPPING as SHORT_READ_MAPPING_R2    } from '../subworkflows/local/short_read_mapping'
 
 def parseSeqkitCount(statsFile) {
     def lines = statsFile.text.readLines().findAll { it?.trim() }
@@ -520,10 +523,32 @@ workflow H2SEQ {
     ch_versions = ch_versions.mix(LONG_READ_MAPPING.out.versions)
     ch_versions = ch_versions.mix(SHORT_READ_MAPPING.out.versions)
 
-    ch_consensus_bam_long = LONG_READ_MAPPING.out.consensus_bam
-    ch_consensus_bam_short = SHORT_READ_MAPPING.out.consensus_bam
-    ch_consensus_bam_idx_long = LONG_READ_MAPPING.out.consensus_bam_idx
-    ch_consensus_bam_idx_short = SHORT_READ_MAPPING.out.consensus_bam_idx
+    // Round 2 for both read types: build a majority-rules draft consensus from the
+    // Round 1 BAM, then remap the original reads to that draft. This removes
+    // panel-reference bias before variant calling without adding any new tool dependencies.
+    SAMTOOLS_CONSENSUS (
+        LONG_READ_MAPPING.out.consensus_bam
+            .mix(SHORT_READ_MAPPING.out.consensus_bam)
+    )
+    ch_versions = ch_versions.mix(SAMTOOLS_CONSENSUS.out.versions)
+
+    ch_draft_ref_long = SAMTOOLS_CONSENSUS.out.fasta
+        .filter { meta, _fasta -> meta.long_reads }
+        .map { meta, fasta -> [meta.id, meta, fasta] }
+
+    ch_draft_ref_short = SAMTOOLS_CONSENSUS.out.fasta
+        .filter { meta, _fasta -> !meta.long_reads }
+        .map { meta, fasta -> [meta.id, meta, fasta] }
+
+    LONG_READ_MAPPING_R2  ( ch_draft_ref_long,  ch_clean_reads_long_ready )
+    SHORT_READ_MAPPING_R2 ( ch_draft_ref_short, ch_clean_reads_short_ready )
+    ch_versions = ch_versions.mix(LONG_READ_MAPPING_R2.out.versions)
+    ch_versions = ch_versions.mix(SHORT_READ_MAPPING_R2.out.versions)
+
+    ch_consensus_bam_long = LONG_READ_MAPPING_R2.out.consensus_bam
+    ch_consensus_bam_short = SHORT_READ_MAPPING_R2.out.consensus_bam
+    ch_consensus_bam_idx_long = LONG_READ_MAPPING_R2.out.consensus_bam_idx
+    ch_consensus_bam_idx_short = SHORT_READ_MAPPING_R2.out.consensus_bam_idx
     ch_consensus_bam = ch_consensus_bam_long.mix(ch_consensus_bam_short)
     ch_consensus_bam_idx = ch_consensus_bam_idx_long.mix(ch_consensus_bam_idx_short)
 
@@ -548,17 +573,15 @@ workflow H2SEQ {
             [meta, bam]
         }
 
-    ch_best_ref_all = ch_best_ref_long.mix(ch_best_ref_short)
-
-    SAMTOOLS_FAIDX (
-        ch_best_ref_all
-            .map { _id, meta, fasta ->
-                [meta, fasta]
-            }
+    // All downstream steps use the Round 2 draft consensus as their reference.
+    SAMTOOLS_FAIDX_DRAFT (
+        ch_draft_ref_long
+            .mix(ch_draft_ref_short)
+            .map { _id, meta, fasta -> [meta, fasta] }
     )
-    ch_versions = ch_versions.mix(SAMTOOLS_FAIDX.out.versions)
+    ch_versions = ch_versions.mix(SAMTOOLS_FAIDX_DRAFT.out.versions)
 
-    ch_reference_fai = SAMTOOLS_FAIDX.out.fa_and_idx
+    ch_reference_fai = SAMTOOLS_FAIDX_DRAFT.out.fa_and_idx
         .map { meta, fasta, fai ->
             [meta.id, meta.long_reads, meta + [reference_name: fai.text.readLines()[0].split('\t')[0]], fasta, fai]
         }
