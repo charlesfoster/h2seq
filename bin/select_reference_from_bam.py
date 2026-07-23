@@ -10,6 +10,12 @@ from pathlib import Path
 
 CIGAR_RE = re.compile(r"(\d+)([MIDNSHP=X])")
 
+# Secondary genotype must capture at least this fraction of total primary-mapped reads
+# to be flagged as a mixed infection.  5 % matches the sister pipeline's D7 threshold:
+# competitive mapping suppresses cross-genotype noise at the read level, so a secondary
+# genotype at ≥5 % is essentially impossible from sequencing error alone.
+MIXED_INFECTION_MIN_FRACTION = 0.05
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -337,13 +343,64 @@ def write_ranking(path, sorted_rows, selection_rule, selected_reference_id=None)
             writer.writerow(output_row)
 
 
-def write_compatible_outputs(args, sorted_rows, selection_rule):
-    winner = sorted_rows[0]
+def compute_genotype_summary(sorted_rows, min_fraction):
+    """Determine the dominant genotype winner and any secondary genotypes.
+
+    The dominant genotype is the one with the most total primary-mapped reads summed
+    across all of its references in the panel.  This prevents a genotype whose reads
+    are spread across many closely-related panel references from losing to a minority
+    genotype that concentrates its reads on a single reference.
+
+    Returns:
+        winner_row  — the highest-ranked row (by aligned_bases) within the dominant
+                      genotype; this is the reference used for consensus generation.
+        secondary   — [(genotype, best_ref_id, fraction), ...] for every other genotype
+                      that captures >= min_fraction of total reads, sorted by fraction desc.
+    """
+    total_reads = sum(row["mapped_reads"] for row in sorted_rows)
+
+    genotype_reads = {}
+    genotype_best_row = {}
+    for row in sorted_rows:
+        try:
+            _, subtype = extract_genotype_subtype(row["reference_id"])
+        except ValueError:
+            continue
+        genotype = "".join(c for c in subtype if c.isdigit())
+        genotype_reads[genotype] = genotype_reads.get(genotype, 0) + row["mapped_reads"]
+        if genotype not in genotype_best_row:
+            genotype_best_row[genotype] = row
+
+    if total_reads == 0:
+        return sorted_rows[0], []
+
+    dominant_genotype = max(genotype_reads, key=lambda g: genotype_reads[g])
+    winner_row = genotype_best_row[dominant_genotype]
+
+    secondary = []
+    for genotype, reads in genotype_reads.items():
+        if genotype == dominant_genotype:
+            continue
+        fraction = reads / total_reads
+        if fraction >= min_fraction:
+            best_ref_id = genotype_best_row[genotype]["reference_id"]
+            _, best_subtype = extract_genotype_subtype(best_ref_id)
+            secondary.append((best_subtype, best_ref_id, fraction))
+
+    secondary.sort(key=lambda x: -x[2])
+    return winner_row, secondary
+
+
+def write_compatible_outputs(args, sorted_rows, selection_rule, winner, secondary_genotypes):
     best_genotype, best_subtype = extract_genotype_subtype(winner["reference_id"])
+
+    # Exact-tie close hits — kept for diagnostic value in the ranking TSV.
     close_hits = [
         row["reference_id"]
-        for row in sorted_rows[1:]
-        if row["aligned_bases"] == winner["aligned_bases"] and row["aligned_bases"] > 0
+        for row in sorted_rows
+        if row["reference_id"] != winner["reference_id"]
+        and row["aligned_bases"] == winner["aligned_bases"]
+        and row["aligned_bases"] > 0
     ]
     other_subtypes = []
     for reference_id in close_hits:
@@ -351,11 +408,16 @@ def write_compatible_outputs(args, sorted_rows, selection_rule):
         if subtype != best_subtype:
             other_subtypes.append(reference_id)
 
+    mixed_infection = len(secondary_genotypes) > 0
+    secondary_genotypes_str = ";".join(f"{subtype}:{f:.4f}" for subtype, _, f in secondary_genotypes)
+
     with open(args.best_ref_txt, "w", encoding="utf-8") as handle:
         handle.write(f"{winner['reference_id']}\n")
 
     with open(args.alternate_subtype_txt, "w", encoding="utf-8") as handle:
         handle.write(f"{winner['reference_id']}\n")
+        for _subtype, ref_id, _fraction in secondary_genotypes:
+            handle.write(f"{ref_id}\n")
 
     columns = [
         "sample_id",
@@ -364,6 +426,8 @@ def write_compatible_outputs(args, sorted_rows, selection_rule):
         "best_ref",
         "close_hits",
         "other_potential_subtypes",
+        "mixed_infection",
+        "secondary_genotypes",
         "selection_method",
         "selection_rule",
         "reference_length",
@@ -390,6 +454,8 @@ def write_compatible_outputs(args, sorted_rows, selection_rule):
                 "best_ref": winner["reference_id"],
                 "close_hits": ";".join(close_hits),
                 "other_potential_subtypes": ";".join(dict.fromkeys(other_subtypes)),
+                "mixed_infection": str(mixed_infection).lower(),
+                "secondary_genotypes": secondary_genotypes_str,
                 "selection_method": "minimap2_competitive_bam",
                 "selection_rule": selection_rule,
                 "reference_length": winner["reference_length"],
@@ -421,6 +487,8 @@ def write_qc_fail_outputs(args, sorted_rows, selection_rule, reason):
         "best_ref",
         "close_hits",
         "other_potential_subtypes",
+        "mixed_infection",
+        "secondary_genotypes",
         "selection_method",
         "selection_rule",
         "reference_length",
@@ -447,6 +515,8 @@ def write_qc_fail_outputs(args, sorted_rows, selection_rule, reason):
                 "best_ref": "",
                 "close_hits": "",
                 "other_potential_subtypes": "",
+                "mixed_infection": "",
+                "secondary_genotypes": "",
                 "selection_method": "minimap2_competitive_bam",
                 "selection_rule": selection_rule,
                 "reference_length": "",
@@ -491,8 +561,9 @@ def main():
         write_qc_fail_outputs(args, sorted_rows, selection_rule, "no_primary_mapped_reads")
         return
 
-    write_ranking(args.ranking_output, sorted_rows, selection_rule, sorted_rows[0]["reference_id"])
-    write_compatible_outputs(args, sorted_rows, selection_rule)
+    winner, secondary_genotypes = compute_genotype_summary(sorted_rows, MIXED_INFECTION_MIN_FRACTION)
+    write_ranking(args.ranking_output, sorted_rows, selection_rule, winner["reference_id"])
+    write_compatible_outputs(args, sorted_rows, selection_rule, winner, secondary_genotypes)
 
 
 if __name__ == "__main__":

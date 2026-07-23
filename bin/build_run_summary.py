@@ -44,6 +44,8 @@ def ensure_row(rows, sample_id, read_type):
             "read_type": read_type,
             "designated_genotype": "",
             "designated_subtype": "",
+            "mixed_infection": "",
+            "secondary_genotypes": "",
             "selected_reference": "",
             "reference_length": "",
             "genome_coverage": "",
@@ -104,8 +106,6 @@ def finalize_qc(rows, min_reference_coverage_pct):
 
         if row.get("qc_status") == "qc_fail":
             row["genotype_subtype_status"] = "unreliable_qc_fail"
-            row["designated_genotype"] = ""
-            row["designated_subtype"] = ""
         elif row.get("designated_genotype") or row.get("designated_subtype"):
             row["qc_status"] = row.get("qc_status") or "pass"
             row["genotype_subtype_status"] = "assigned"
@@ -139,6 +139,8 @@ def main():
             row = ensure_row(rows, sample_id, read_type)
             row["designated_genotype"] = record.get("genotype", "")
             row["designated_subtype"] = record.get("subtype", "")
+            row["mixed_infection"] = record.get("mixed_infection", "")
+            row["secondary_genotypes"] = record.get("secondary_genotypes", "")
             row["selected_reference"] = record.get("best_ref", row["selected_reference"])
             row["qc_status"] = record.get("selection_status", row["qc_status"])
             row["qc_fail_reason"] = record.get("qc_fail_reason", row["qc_fail_reason"])
@@ -192,6 +194,8 @@ def main():
         "read_type",
         "designated_genotype",
         "designated_subtype",
+        "mixed_infection",
+        "secondary_genotypes",
         "selected_reference",
         "reference_length",
         "genome_coverage",
@@ -217,6 +221,8 @@ def main():
             "read_type": {"title": "Read Type"},
             "designated_genotype": {"title": "Genotype"},
             "designated_subtype": {"title": "Subtype"},
+            "mixed_infection": {"title": "Mixed Infection"},
+            "secondary_genotypes": {"title": "Secondary Genotypes"},
             "selected_reference": {"title": "Reference"},
             "reference_length": {"title": "Reference Length"},
             "genome_coverage": {"title": "Genome Cov %", "format": "{:,.1f}"},
