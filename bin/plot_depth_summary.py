@@ -32,14 +32,16 @@ def load_coverage_summary(path):
     }
 
 
-def load_per_base_segments(path):
+def load_per_base_segments(path, reference_name):
     segments = []
     with gzip.open(path, "rt") as handle:
         for line in handle:
             line = line.strip()
             if not line:
                 continue
-            _chrom, start, end, depth = line.split("\t")[:4]
+            chrom, start, end, depth = line.split("\t")[:4]
+            if chrom != reference_name:
+                continue
             segments.append((int(start), int(end), float(depth)))
     return segments
 
@@ -99,7 +101,7 @@ def create_depth_plot(args, coverage_summary, segments):
 def main():
     args = parse_args()
     coverage_summary = load_coverage_summary(args.coverage_summary)
-    segments = load_per_base_segments(args.per_base_bed_gz)
+    segments = load_per_base_segments(args.per_base_bed_gz, args.reference_name)
     create_depth_plot(args, coverage_summary, segments)
 
 
