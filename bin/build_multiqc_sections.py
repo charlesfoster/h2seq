@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 import argparse
 import csv
+import gzip
 import json
 from pathlib import Path
-
-import matplotlib.pyplot as plt
 
 MOSDEPTH_COVERAGE_THRESHOLDS = [1, 5, 10, 20, 30, 50, 100]
 HCV_FEATURES = [
@@ -153,25 +152,81 @@ def parse_mosdepth_summary(path):
     raise ValueError(f"No total row found in {path}")
 
 
+def parse_per_base_coverage(path):
+    metrics = {}
+    with gzip.open(path, "rt") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            reference, start, end, depth = line.split("\t")[:4]
+            length = int(end) - int(start)
+            depth = float(depth)
+            row = metrics.setdefault(
+                reference,
+                {"genome_length": 0, "depth_sum": 0.0, "min_coverage": None, "max_coverage": 0.0, "depth_lengths": {}},
+            )
+            row["genome_length"] += length
+            row["depth_sum"] += length * depth
+            row["min_coverage"] = depth if row["min_coverage"] is None else min(row["min_coverage"], depth)
+            row["max_coverage"] = max(row["max_coverage"], depth)
+            row["depth_lengths"][depth] = row["depth_lengths"].get(depth, 0) + length
+
+    for row in metrics.values():
+        genome_length = row["genome_length"]
+        row["mean_coverage"] = row["depth_sum"] / genome_length if genome_length else 0.0
+        midpoint = genome_length / 2.0
+        cumulative = 0
+        row["median_coverage"] = 0.0
+        for depth, length in sorted(row["depth_lengths"].items()):
+            cumulative += length
+            if cumulative >= midpoint:
+                row["median_coverage"] = depth
+                break
+        for threshold in MOSDEPTH_COVERAGE_THRESHOLDS:
+            covered = sum(length for depth, length in row["depth_lengths"].items() if depth >= threshold)
+            row[f"coverage_{threshold}x_pct"] = covered / genome_length * 100.0 if genome_length else 0.0
+        del row["depth_sum"]
+        del row["depth_lengths"]
+    return metrics
+
+
 def build_coverage_section(outdir):
+    selected_references = {}
+    for path in sorted(outdir.rglob("*.best_reference.tsv")):
+        records = load_tsv_rows(path)
+        if not records:
+            continue
+        sample_id, read_type = infer_sample_and_read_type(path)
+        selected_references[(sample_id, read_type)] = records[0].get("best_ref", "")
+
     rows = {}
-
-    for path in sorted(outdir.rglob("*.mosdepth.summary.txt")):
+    for path in sorted(outdir.rglob("*.per-base.bed.gz")):
         sample_id, read_type = infer_sample_and_read_type(path)
-        key = (sample_id, read_type)
-        rows.setdefault(key, {"sample_id": sample_id, "read_type": read_type})
-        rows[key].update(parse_mosdepth_summary(path))
-
-    for path in sorted(outdir.rglob("*.mosdepth.global.dist.txt")):
-        sample_id, read_type = infer_sample_and_read_type(path)
-        key = (sample_id, read_type)
-        rows.setdefault(key, {"sample_id": sample_id, "read_type": read_type})
-        rows[key].update(parse_mosdepth_global_dist(path))
+        sample_key = (sample_id, read_type)
+        for reference, metrics in parse_per_base_coverage(path).items():
+            key = (sample_id, read_type, reference)
+            rows[key] = {
+                "sample_id": sample_id,
+                "read_type": read_type,
+                "reference": reference,
+                "component_role": "main" if reference == selected_references.get(sample_key, reference) else "secondary",
+                **metrics,
+            }
 
     table_data = {}
+    component_counts = {}
+    for sample_id, read_type, _reference in rows:
+        component_counts[(sample_id, read_type)] = component_counts.get((sample_id, read_type), 0) + 1
+
     for key in sorted(rows):
         row = rows[key]
-        table_data[row_label(row["sample_id"], row["read_type"])] = {
+        label = row_label(row["sample_id"], row["read_type"])
+        if component_counts[(row["sample_id"], row["read_type"])] > 1:
+            label = f"{label} [{row['component_role']}: {row['reference']}]"
+        table_data[label] = {
+            "reference": row["reference"],
+            "component_role": row["component_role"],
             "median_coverage": row.get("median_coverage", ""),
             "mean_coverage": row.get("mean_coverage", ""),
             "min_coverage": row.get("min_coverage", ""),
@@ -179,7 +234,7 @@ def build_coverage_section(outdir):
             "genome_length": row.get("genome_length", ""),
         }
         for depth in MOSDEPTH_COVERAGE_THRESHOLDS:
-            table_data[row_label(row["sample_id"], row["read_type"])][f"coverage_{depth}x_pct"] = row.get(
+            table_data[label][f"coverage_{depth}x_pct"] = row.get(
                 f"coverage_{depth}x_pct", ""
             )
 
@@ -193,6 +248,8 @@ def build_coverage_section(outdir):
         }
     headers.update(
         {
+            "reference": {"title": "Reference"},
+            "component_role": {"title": "Component"},
             "median_coverage": {"title": "Median", "format": "{:,.1f}X"},
             "mean_coverage": {"title": "Mean Cov.", "format": "{:,.1f}"},
             "min_coverage": {"title": "Min Cov.", "format": "{:,.1f}"},
@@ -204,7 +261,7 @@ def build_coverage_section(outdir):
     return {
         "id": "h2seq_coverage_statistics",
         "section_name": "Coverage Statistics",
-        "description": "Coverage summary metrics derived from mosdepth outputs.",
+        "description": "Per-reference coverage metrics. Mixed infections are shown as separate main and secondary components; ambiguous fragments are excluded before depth calculation.",
         "plot_type": "table",
         "pconfig": {
             "id": "h2seq_coverage_statistics_table",
@@ -355,55 +412,50 @@ def build_variant_section(outdir):
 
 def build_region_coverage_rows(outdir):
     rows = {}
+    selected_references = {}
+    for path in sorted(outdir.rglob("*.best_reference.tsv")):
+        records = load_tsv_rows(path)
+        if records:
+            sample_id, read_type = infer_sample_and_read_type(path)
+            selected_references[(sample_id, read_type)] = records[0].get("best_ref", "")
 
-    combined_summary = outdir / "combined_results_summary.csv"
-    if combined_summary.exists():
-        with open(combined_summary, newline="") as handle:
-            for record in csv.DictReader(handle):
-                sample_id = record.get("sample_id", "")
-                read_type = record.get("read_type", "")
-                if not sample_id or not read_type:
-                    continue
-                key = (sample_id, read_type)
-                rows.setdefault(
-                    key,
-                    {
-                        "sample_id": sample_id,
-                        "read_type": read_type,
-                        **{feature: 0.0 for feature in HCV_FEATURES},
-                    },
-                )
-
-    if not rows:
-        for path in sorted(outdir.rglob("*.coverage_summary.tsv")):
-            for record in load_tsv_rows(path):
-                sample_id = record.get("sample_id", "")
-                read_type = record.get("read_type", "")
-                if not sample_id or not read_type:
-                    continue
-                key = (sample_id, read_type)
-                rows.setdefault(
-                    key,
-                    {
-                        "sample_id": sample_id,
-                        "read_type": read_type,
-                        **{feature: 0.0 for feature in HCV_FEATURES},
-                    },
-                )
-
-    for path in sorted(outdir.rglob("*.hcv_glue_coverage.tsv")):
+    for path in sorted(outdir.rglob("*.coverage_summary.tsv")):
         for record in load_tsv_rows(path):
             sample_id = record.get("sample_id", "")
             read_type = record.get("read_type", "")
-            feature = record.get("feature", "")
-            if feature not in HCV_FEATURES:
+            if not sample_id or not read_type:
                 continue
-            key = (sample_id, read_type)
+            reference = record.get("reference_name", "")
+            key = (sample_id, read_type, reference)
             rows.setdefault(
                 key,
                 {
                     "sample_id": sample_id,
                     "read_type": read_type,
+                    "reference_name": reference,
+                    "component_role": (
+                        "main" if reference == selected_references.get((sample_id, read_type), reference) else "secondary"
+                    ),
+                    **{feature: 0.0 for feature in HCV_FEATURES},
+                },
+            )
+
+    for path in sorted(outdir.rglob("*.hcv_glue_coverage.tsv")):
+        for record in load_tsv_rows(path):
+            sample_id = record.get("sample_id", "")
+            read_type = record.get("read_type", "")
+            reference = record.get("reference_name", "")
+            feature = record.get("feature", "")
+            if feature not in HCV_FEATURES:
+                continue
+            key = (sample_id, read_type, reference)
+            rows.setdefault(
+                key,
+                {
+                    "sample_id": sample_id,
+                    "read_type": read_type,
+                    "reference_name": reference,
+                    "component_role": "",
                     **{feature_name: 0.0 for feature_name in HCV_FEATURES},
                 },
             )
@@ -419,7 +471,16 @@ def build_region_coverage_section(outdir):
         return {}
 
     ordered_rows = [rows[key] for key in sorted(rows)]
-    sample_labels = [row_label(row["sample_id"], row["read_type"]) for row in ordered_rows]
+    component_counts = {}
+    for row in ordered_rows:
+        key = (row["sample_id"], row["read_type"])
+        component_counts[key] = component_counts.get(key, 0) + 1
+    sample_labels = []
+    for row in ordered_rows:
+        label = row_label(row["sample_id"], row["read_type"])
+        if component_counts[(row["sample_id"], row["read_type"])] > 1:
+            label = f"{label} [{row['component_role']}: {row['reference_name']}]"
+        sample_labels.append(label)
     matrix = [[row.get(feature, 0.0) for feature in HCV_FEATURES] for row in ordered_rows]
 
     return {
@@ -445,6 +506,8 @@ def build_region_coverage_section(outdir):
 
 
 def write_region_coverage_heatmap(path, outdir):
+    import matplotlib.pyplot as plt
+
     rows = build_region_coverage_rows(outdir)
 
     if not rows:
@@ -457,7 +520,16 @@ def write_region_coverage_heatmap(path, outdir):
         return
 
     ordered_rows = [rows[key] for key in sorted(rows)]
-    sample_labels = [row_label(row["sample_id"], row["read_type"]) for row in ordered_rows]
+    component_counts = {}
+    for row in ordered_rows:
+        key = (row["sample_id"], row["read_type"])
+        component_counts[key] = component_counts.get(key, 0) + 1
+    sample_labels = []
+    for row in ordered_rows:
+        label = row_label(row["sample_id"], row["read_type"])
+        if component_counts[(row["sample_id"], row["read_type"])] > 1:
+            label = f"{label} [{row['component_role']}: {row['reference_name']}]"
+        sample_labels.append(label)
     matrix = [[row.get(feature, 0.0) if row.get(feature, None) is not None else float("nan") for feature in HCV_FEATURES] for row in ordered_rows]
 
     fig_height = max(2.6, 0.55 * len(sample_labels) + 1.8)

@@ -15,7 +15,7 @@ process PLOT_HCV_SUMMARY {
     path "versions.yml"                               , emit: versions
 
     script:
-    def prefix = task.ext.prefix ?: "${meta.id}"
+    def prefix = task.ext.prefix ?: "${meta.id}.${meta.reference_name}.${meta.component_role}"
     def readType = meta.long_reads ? 'long' : 'short'
     def plotScriptMtime = file("${projectDir}/bin/plot_hcv_summary.py").lastModified()
     """
@@ -25,6 +25,7 @@ process PLOT_HCV_SUMMARY {
     python3 ${projectDir}/bin/plot_hcv_summary.py \\
         --sample-id ${meta.id} \\
         --read-type ${readType} \\
+        --reference-name "${meta.reference_name}" \\
         --coverage-summary ${coverage_summary} \\
         --hcv-coverage ${hcv_coverage_tsv} \\
         --feature-plot-output ${prefix}.feature_coverage.png
@@ -36,7 +37,7 @@ process PLOT_HCV_SUMMARY {
     """
 
     stub:
-    def prefix = task.ext.prefix ?: "${meta.id}"
+    def prefix = task.ext.prefix ?: "${meta.id}.${meta.reference_name}.${meta.component_role}"
     def plotScriptMtime = file("${projectDir}/bin/plot_hcv_summary.py").lastModified()
     """
     # plot_hcv_summary_py_mtime=${plotScriptMtime}

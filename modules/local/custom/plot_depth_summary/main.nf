@@ -15,9 +15,11 @@ process PLOT_DEPTH_SUMMARY {
     path "versions.yml"                            , emit: versions
 
     script:
-    def prefix = task.ext.prefix ?: "${meta.id}"
+    def prefix = task.ext.prefix ?: "${meta.id}.${meta.reference_name}.${meta.component_role}"
     def readType = meta.long_reads ? 'long' : 'short'
+    def plotScriptMtime = file("${projectDir}/bin/plot_depth_summary.py").lastModified()
     """
+    # plot_depth_summary_py_mtime=${plotScriptMtime}
     export MPLCONFIGDIR=\$PWD/.mplconfig
 
     python3 ${projectDir}/bin/plot_depth_summary.py \\
@@ -36,8 +38,10 @@ process PLOT_DEPTH_SUMMARY {
     """
 
     stub:
-    def prefix = task.ext.prefix ?: "${meta.id}"
+    def prefix = task.ext.prefix ?: "${meta.id}.${meta.reference_name}.${meta.component_role}"
+    def plotScriptMtime = file("${projectDir}/bin/plot_depth_summary.py").lastModified()
     """
+    # plot_depth_summary_py_mtime=${plotScriptMtime}
     python3 - <<-'PY'
     import base64
     png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9pM8S2QAAAAASUVORK5CYII=")

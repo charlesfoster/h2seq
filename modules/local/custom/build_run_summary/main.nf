@@ -14,6 +14,7 @@ process BUILD_RUN_SUMMARY {
 
     output:
     path "combined_results_summary.csv", emit: csv
+    path "reference_component_summary.csv", emit: components
     path "combined_results_summary_mqc.json", emit: mqc
 
     when:
@@ -26,6 +27,7 @@ process BUILD_RUN_SUMMARY {
         --pipeline-version "${pipeline_version}" \\
         --min-reference-coverage-pct ${params.qc_min_ref_coverage_pct} \\
         --output combined_results_summary.csv \\
+        --component-output reference_component_summary.csv \\
         --multiqc-output combined_results_summary_mqc.json
     """
 
@@ -34,6 +36,11 @@ process BUILD_RUN_SUMMARY {
     cat <<-EOF > combined_results_summary.csv
     sample_id,read_type,pipeline_version
     stub,stub,stub
+    EOF
+
+    cat <<-EOF > reference_component_summary.csv
+    sample_id,read_type,component_role,reference_name,assigned_fraction_of_assigned
+    stub,stub,main,ref,1.0
     EOF
 
     cat <<-EOF > combined_results_summary_mqc.json

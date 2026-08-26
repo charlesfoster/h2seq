@@ -6,7 +6,7 @@ process HCV_GLUE {
     tuple val(meta), path(fasta)
 
     output:
-    tuple val(meta), path("*.html") , emit: report, optional: true
+    tuple val(meta), path("*.html") , emit: report
 
     when:
     task.ext.when == null || task.ext.when

@@ -52,6 +52,7 @@ include { COVERAGE_METRICS          } from '../modules/local/custom/coverage_met
 include { BUILD_RUN_SUMMARY         } from '../modules/local/custom/build_run_summary/main'
 include { BUILD_MULTIQC_SECTIONS    } from '../modules/local/custom/build_multiqc_sections/main'
 include { COUNT_MAPPED_READS        } from '../modules/local/custom/count_mapped_reads/main'
+include { FILTER_MIXED_REFERENCE_ALIGNMENTS } from '../modules/local/custom/filter_mixed_reference_alignments/main'
 include { REFERENCE_METADATA_FROM_FASTA } from '../modules/local/custom/reference_metadata_from_fasta/main'
 include { GENERATE_WHOLE_GENOME_BED } from '../modules/local/custom/generate_whole_genome_bed/main'
 include { LOFREQ_INDELQUAL          } from '../modules/local/custom/lofreq_indelqual/main'
@@ -545,12 +546,18 @@ workflow H2SEQ {
     ch_versions = ch_versions.mix(LONG_READ_MAPPING_R2.out.versions)
     ch_versions = ch_versions.mix(SHORT_READ_MAPPING_R2.out.versions)
 
-    ch_consensus_bam_long = LONG_READ_MAPPING_R2.out.consensus_bam
-    ch_consensus_bam_short = SHORT_READ_MAPPING_R2.out.consensus_bam
-    ch_consensus_bam_idx_long = LONG_READ_MAPPING_R2.out.consensus_bam_idx
-    ch_consensus_bam_idx_short = SHORT_READ_MAPPING_R2.out.consensus_bam_idx
-    ch_consensus_bam = ch_consensus_bam_long.mix(ch_consensus_bam_short)
-    ch_consensus_bam_idx = ch_consensus_bam_idx_long.mix(ch_consensus_bam_idx_short)
+    ch_consensus_bam_unfiltered = LONG_READ_MAPPING_R2.out.consensus_bam
+        .mix(SHORT_READ_MAPPING_R2.out.consensus_bam)
+
+    FILTER_MIXED_REFERENCE_ALIGNMENTS (
+        ch_consensus_bam_unfiltered
+    )
+    ch_versions = ch_versions.mix(FILTER_MIXED_REFERENCE_ALIGNMENTS.out.versions)
+
+    ch_consensus_bam = FILTER_MIXED_REFERENCE_ALIGNMENTS.out.bam
+        .map { meta, bam, _idx -> [meta, bam] }
+    ch_consensus_bam_idx = FILTER_MIXED_REFERENCE_ALIGNMENTS.out.bam
+        .map { meta, _bam, idx -> [meta, idx] }
 
     COUNT_MAPPED_READS (
         ch_consensus_bam
@@ -581,9 +588,15 @@ workflow H2SEQ {
     )
     ch_versions = ch_versions.mix(SAMTOOLS_FAIDX_DRAFT.out.versions)
 
+    ch_primary_ref_txt_keyed = ch_best_ref_txt
+        .map { meta, txt -> [meta.id, meta.long_reads, meta, txt] }
+
     ch_reference_fai = SAMTOOLS_FAIDX_DRAFT.out.fa_and_idx
-        .map { meta, fasta, fai ->
-            [meta.id, meta.long_reads, meta + [reference_name: fai.text.readLines()[0].split('\t')[0]], fasta, fai]
+        .map { meta, fasta, fai -> [meta.id, meta.long_reads, meta, fasta, fai] }
+        .combine(ch_primary_ref_txt_keyed, by: [0, 1])
+        .map { _id, _long_reads, meta, fasta, fai, _refMeta, bestRefTxt ->
+            def selectedReference = bestRefTxt.text.readLines().find { it.trim() }?.trim()
+            [meta.id, meta.long_reads, meta + [reference_name: selectedReference], fasta, fai]
         }
 
     GENERATE_WHOLE_GENOME_BED (
@@ -857,6 +870,21 @@ workflow H2SEQ {
             .filter { meta, _fasta -> meta.consensus_type == "simple" }
     }
 
+    // Attach the actual reference represented by each split consensus so mixed
+    // infections can be reported once per retained component.
+    ch_simple_component_consensuses = ch_simple_split_consensuses
+        .transpose()
+        .map { meta, fasta ->
+            def selectedReference = meta.reference_name
+            def referenceName = fasta.text.readLines()
+                .find { it.startsWith('>') }
+                ?.substring(1)
+                ?.tokenize()
+                ?.last()
+            def componentRole = referenceName == selectedReference ? 'main' : 'secondary'
+            [meta + [reference_name: referenceName, component_role: componentRole], fasta]
+        }
+
     /*
     ================================================================================
                                     HCV Analysis
@@ -865,9 +893,7 @@ workflow H2SEQ {
 
     if ( params.run_hcv_glue ){
 
-        REMOVE_EMPTY_SEQUENCES (
-            ch_simple_split_consensuses
-        )
+        REMOVE_EMPTY_SEQUENCES ( ch_simple_component_consensuses )
         ch_versions = ch_versions.mix(REMOVE_EMPTY_SEQUENCES.out.versions)
 
         // Handy hint: transpose operator "transposes" each tuple from a source channel
@@ -875,7 +901,6 @@ workflow H2SEQ {
         // Practical example: if the channel has [[meta], fasta1, fasta2], then transpose will lead
         //      to [[[meta], fasta1], [[meta],fasta2]]
         ch_glue_fa = REMOVE_EMPTY_SEQUENCES.out.fasta
-            .transpose()
 
         HCV_GLUE (
             ch_glue_fa
@@ -886,20 +911,21 @@ workflow H2SEQ {
         ch_hcv_reports = Channel.empty()
     }
 
-    ch_hcv_main_reports = ch_hcv_reports
-        .filter { _meta, html -> html.name.contains("consensus_main") }
-
-    ch_depth_plot_input = MOSDEPTH_GENOME.out.per_base_bed
-        .map { meta, per_base_bed_gz ->
-            [meta.id, meta.long_reads, meta, per_base_bed_gz]
-        }
+    ch_depth_plot_input = ch_simple_component_consensuses
+        .map { meta, _fasta -> [meta.id, meta.long_reads, meta] }
         .combine(
-            COVERAGE_METRICS.out.summary.map { meta, summary ->
-                [meta.id, meta.long_reads, meta, summary]
+            MOSDEPTH_GENOME.out.per_base_bed.map { _meta, per_base_bed_gz ->
+                [_meta.id, _meta.long_reads, per_base_bed_gz]
             },
             by: [0, 1]
         )
-        .map { _id, _long_reads, meta, per_base_bed_gz, _meta2, summary ->
+        .combine(
+            COVERAGE_METRICS.out.summary.map { _meta, summary ->
+                [_meta.id, _meta.long_reads, summary]
+            },
+            by: [0, 1]
+        )
+        .map { _id, _long_reads, meta, per_base_bed_gz, summary ->
             [meta, per_base_bed_gz, summary]
         }
 
@@ -908,15 +934,13 @@ workflow H2SEQ {
     )
     ch_versions = ch_versions.mix(PLOT_DEPTH_SUMMARY.out.versions)
 
-    if (params.virus_preset == "hcv" && params.run_hcv_glue) {
-        PARSE_HCV_GLUE_COVERAGE (
-            ch_hcv_main_reports
-        )
+    if (params.run_hcv_glue) {
+        PARSE_HCV_GLUE_COVERAGE ( ch_hcv_reports )
         ch_versions = ch_versions.mix(PARSE_HCV_GLUE_COVERAGE.out.versions)
 
         ch_hcv_plot_input = COVERAGE_METRICS.out.summary
             .map { meta, summary ->
-                [meta.id, meta.long_reads, meta, summary]
+                [meta.id, meta.long_reads, summary]
             }
             .combine(
                 PARSE_HCV_GLUE_COVERAGE.out.tsv.map { meta, tsv ->
@@ -924,7 +948,7 @@ workflow H2SEQ {
                 },
                 by: [0, 1]
             )
-            .map { _id, _long_reads, meta, summary, _meta3, hcv_tsv ->
+            .map { _id, _long_reads, summary, meta, hcv_tsv ->
                 [meta, summary, hcv_tsv]
             }
 
@@ -934,71 +958,62 @@ workflow H2SEQ {
         ch_versions = ch_versions.mix(PLOT_HCV_SUMMARY.out.versions)
     }
 
-    ch_report_base = ch_best_ref_tsv
-        .map { meta, best_ref_tsv ->
-            [meta.id, meta.long_reads, meta, best_ref_tsv]
+    ch_report_base = PLOT_DEPTH_SUMMARY.out.depth
+        .map { meta, depth_plot ->
+            [meta.id, meta.long_reads, meta.reference_name, meta, depth_plot]
         }
+        .combine(
+            ch_best_ref_tsv.map { meta, best_ref_tsv ->
+                [meta.id, meta.long_reads, best_ref_tsv]
+            },
+            by: [0, 1]
+        )
         .combine(
             COVERAGE_METRICS.out.summary.map { meta, summary ->
-                [meta.id, meta.long_reads, meta, summary]
+                [meta.id, meta.long_reads, summary]
             },
             by: [0, 1]
         )
         .combine(
-            PLOT_DEPTH_SUMMARY.out.depth.map { meta, depth_plot ->
-                [meta.id, meta.long_reads, meta, depth_plot]
+            FILTER_MIXED_REFERENCE_ALIGNMENTS.out.summary.map { meta, assignment_summary ->
+                [meta.id, meta.long_reads, assignment_summary]
             },
             by: [0, 1]
         )
-        .map { _id, _long_reads, meta, best_ref_tsv, _meta2, summary, _meta3, depth_plot ->
-            [meta.id, meta.long_reads, meta, best_ref_tsv, summary, depth_plot]
+        .map { id, long_reads, reference_name, meta, depth_plot, best_ref_tsv, summary, assignment_summary ->
+            [id, long_reads, reference_name, meta, best_ref_tsv, summary, depth_plot, assignment_summary]
         }
 
-    if (params.virus_preset == "hcv" && params.run_hcv_glue) {
+    if (params.run_hcv_glue) {
         ch_hcv_report_features = PLOT_HCV_SUMMARY.out.feature
             .map { meta, feature_plot ->
-                [meta.id, meta.long_reads, meta, feature_plot]
+                [meta.id, meta.long_reads, meta.reference_name, feature_plot]
             }
             .combine(
                 PARSE_HCV_GLUE_COVERAGE.out.tsv.map { meta, hcv_tsv ->
-                    [meta.id, meta.long_reads, meta, hcv_tsv]
+                    [meta.id, meta.long_reads, meta.reference_name, hcv_tsv]
                 },
-                by: [0, 1]
+                by: [0, 1, 2]
             )
-            .map { id, long_reads, _meta, feature_plot, _meta2, hcv_tsv ->
-                [[id, long_reads], null, [feature_plot, hcv_tsv]]
+            .map { id, long_reads, reference_name, feature_plot, hcv_tsv ->
+                [id, long_reads, reference_name, feature_plot, hcv_tsv]
             }
 
-        ch_report_grouped = ch_report_base
-            .map { id, long_reads, meta, best_ref_tsv, summary, depth_plot ->
-                [[id, long_reads], [meta, best_ref_tsv, summary, depth_plot], null]
-            }
-            .mix(ch_hcv_report_features)
-            .groupTuple()
-
-        ch_report_input_with_feature = ch_report_grouped
-            .map { _key, payloads, feature_payloads ->
-                def payload = payloads.find { it != null }
-                def featurePayload = feature_payloads.find { it != null }
-                [payload, featurePayload]
-            }
-            .filter { payload, featurePayload -> payload != null && featurePayload != null }
-            .map { payload, featurePayload ->
-                def (meta, best_ref_tsv, summary, depth_plot) = payload
-                def (featurePlot, hcvTsv) = featurePayload
-                [meta, best_ref_tsv, summary, depth_plot, featurePlot, hcvTsv]
+        ch_report_input_with_feature = ch_report_base
+            .combine(ch_hcv_report_features, by: [0, 1, 2])
+            .map { _id, _long_reads, _reference_name, meta, best_ref_tsv, summary, depth_plot, assignment_summary, feature_plot, hcv_tsv ->
+                [meta, best_ref_tsv, summary, depth_plot, assignment_summary, feature_plot, hcv_tsv]
             }
 
-        ch_report_input_without_feature = ch_report_grouped
-            .map { _key, payloads, feature_payloads ->
-                def payload = payloads.find { it != null }
-                def featurePayload = feature_payloads.find { it != null }
-                [payload, featurePayload]
+        ch_empty_report_components = REMOVE_EMPTY_SEQUENCES.out.empty_fasta
+            .map { meta, empty_fasta ->
+                [meta.id, meta.long_reads, meta.reference_name, empty_fasta]
             }
-            .filter { payload, featurePayload -> payload != null && featurePayload == null }
-            .map { payload, _featurePayload ->
-                def (meta, best_ref_tsv, summary, depth_plot) = payload
-                [meta, best_ref_tsv, summary, depth_plot]
+
+        ch_report_input_without_feature = ch_report_base
+            .combine(ch_empty_report_components, by: [0, 1, 2])
+            .map { _id, _long_reads, _reference_name, meta, best_ref_tsv, summary, depth_plot, assignment_summary, _empty_fasta ->
+                [meta, best_ref_tsv, summary, depth_plot, assignment_summary]
             }
 
         RENDER_HCV_REPORT (
@@ -1018,8 +1033,8 @@ workflow H2SEQ {
             .mix(RENDER_SUMMARY_REPORT.out.versions)
     } else {
         ch_report_input_without_feature = ch_report_base
-            .map { _id, _long_reads, meta, best_ref_tsv, summary, depth_plot ->
-                [meta, best_ref_tsv, summary, depth_plot]
+            .map { _id, _long_reads, _reference_name, meta, best_ref_tsv, summary, depth_plot, assignment_summary ->
+                [meta, best_ref_tsv, summary, depth_plot, assignment_summary]
             }
 
         RENDER_SUMMARY_REPORT (
@@ -1042,12 +1057,13 @@ workflow H2SEQ {
         .mix(ch_short_raw_stats)
         .mix(ch_short_clean_stats)
         .mix(COUNT_MAPPED_READS.out.txt)
+        .mix(FILTER_MIXED_REFERENCE_ALIGNMENTS.out.summary)
 
     ch_summary_triggers = ch_summary_triggers.mix(ch_best_ref_tsv)
     ch_summary_triggers = ch_summary_triggers
         .mix(PLOT_DEPTH_SUMMARY.out.depth)
         .mix(RENDER_SUMMARY_REPORT.out.pdf)
-    if (params.virus_preset == "hcv" && params.run_hcv_glue) {
+    if (params.run_hcv_glue) {
         ch_summary_triggers = ch_summary_triggers
             .mix(REMOVE_EMPTY_SEQUENCES.out.empty_fasta)
             .mix(PARSE_HCV_GLUE_COVERAGE.out.tsv)
@@ -1113,7 +1129,7 @@ workflow H2SEQ {
     ch_multiqc_files = ch_multiqc_files.mix(BUILD_MULTIQC_SECTIONS.out.coverage)
     ch_multiqc_files = ch_multiqc_files.mix(BUILD_MULTIQC_SECTIONS.out.read_stats)
     ch_multiqc_files = ch_multiqc_files.mix(BUILD_MULTIQC_SECTIONS.out.variants)
-    if (params.virus_preset == "hcv" && params.run_hcv_glue) {
+    if (params.run_hcv_glue) {
         ch_multiqc_files = ch_multiqc_files.mix(BUILD_MULTIQC_SECTIONS.out.region_coverage)
     }
     ch_multiqc_files = ch_multiqc_files.mix(
@@ -1137,6 +1153,7 @@ workflow H2SEQ {
     multiqc_report = MULTIQC.out.report.toList() // channel: /path/to/multiqc_report.html
     versions       = ch_versions                 // channel: [ path(versions.yml) ]
     run_summary    = BUILD_RUN_SUMMARY.out.csv
+    component_summary = BUILD_RUN_SUMMARY.out.components
 }
 
 /*

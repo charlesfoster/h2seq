@@ -71,6 +71,7 @@ The current workflow uses the following primary tools:
 #### Coverage, reporting, and HCV-specific outputs
 
 - Coverage is calculated with `mosdepth`, and the pipeline produces depth summaries, mapped-read counts, and per-sample coverage metrics.
+- For mixed infections, competitively mapped fragments are assigned to one retained reference; low-confidence or mate-conflicting fragments are excluded from component-specific analysis. The combined summary retains one row per sample/read type with final component fractions, while `reference_component_summary.csv` and reference-specific PDF reports describe every retained component.
 - Samples with no primary mapped reads, low selected-reference coverage, or an all-`N` main consensus before HCV-GLUE are retained in the combined summary as `qc_fail`; genotype/subtype assignments for those rows are flagged as unreliable.
 - Custom summary tables and plots are generated for integration into `MultiQC`.
 - When enabled, the optional `HCV-GLUE` integration adds HCV-specific reporting and genomic-region coverage summaries for final consensus genomes.

@@ -18,13 +18,14 @@ def parse_args():
     return parser.parse_args()
 
 
-def load_coverage_summary(path):
+def load_coverage_summary(path, reference_name):
     with open(path, newline="") as handle:
         reader = csv.DictReader(handle, delimiter="\t")
         rows = list(reader)
-    if len(rows) != 1:
-        raise ValueError(f"Expected one row in {path}, found {len(rows)}")
-    row = rows[0]
+    matching = [row for row in rows if row.get("reference_name") == reference_name]
+    if len(matching) != 1:
+        raise ValueError(f"Expected one {reference_name} row in {path}, found {len(matching)}")
+    row = matching[0]
     return {
         "reference_length": int(float(row["reference_length"])),
         "genome_coverage_pct": float(row["genome_coverage_pct"]),
@@ -73,7 +74,11 @@ def create_depth_plot(args, coverage_summary, segments):
     ax.plot(x_values, [min(value, y_max) for value in y_values], color="#127a5a", linewidth=1.2)
     ax.axhline(args.min_depth, color="#d9472b", linestyle="--", linewidth=1.0)
     ax.text(reference_length * 0.995, args.min_depth + (y_max * 0.015), f"{args.min_depth:g}x threshold", ha="right", va="bottom", fontsize=8)
-    ax.set_title(f"{args.sample_id} ({args.read_type}) coverage across selected reference genome", fontsize=11, weight="bold")
+    ax.set_title(
+        f"{args.sample_id} ({args.read_type}) coverage across {args.reference_name}",
+        fontsize=11,
+        weight="bold",
+    )
     ax.set_ylabel("Depth", labelpad=16)
     ax.set_xlabel("Reference position")
     ax.set_xlim(0, reference_length)
@@ -100,7 +105,7 @@ def create_depth_plot(args, coverage_summary, segments):
 
 def main():
     args = parse_args()
-    coverage_summary = load_coverage_summary(args.coverage_summary)
+    coverage_summary = load_coverage_summary(args.coverage_summary, args.reference_name)
     segments = load_per_base_segments(args.per_base_bed_gz, args.reference_name)
     create_depth_plot(args, coverage_summary, segments)
 

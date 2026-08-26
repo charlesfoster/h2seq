@@ -102,7 +102,25 @@ Samples with no usable data are handled explicitly so that they do not fail the 
 - no reads after QC
 - no mapped reads
 
-Those samples still appear in the final `run_summary.csv` with `notes` describing what happened. Unexpected process failures still stop the pipeline.
+Those samples still appear in the final `combined_results_summary.csv` with QC status and failure-reason fields describing what happened. Unexpected process failures still stop the pipeline.
+
+## Mixed Infections
+
+When reference selection retains multiple genotype references, the second mapping
+pass is competitive. Each fragment (an individual long read or an Illumina read
+pair) contributes to only one reference when its primary alignment is sufficiently
+confident. Fragments with mapping quality below
+`--mixed_assignment_min_mapq` (default `10`), and pairs whose mates map primarily to
+different references, are excluded from genotype-specific coverage, variant calling,
+and consensus generation.
+
+The existing `combined_results_summary.csv` remains one row per sample and read type
+and reports the main selected component. Its `component_fractions` field is derived
+from the final confidently assigned fragments rather than the preliminary reference-
+selection score. Use `reference_component_summary.csv` for one row per main or
+secondary reference component, including component-specific coverage, mean depth,
+assignment counts, and the number of ambiguous fragments. A separate PDF report is
+generated for every retained component.
 
 ## Profiles
 

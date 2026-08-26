@@ -74,20 +74,9 @@ def main():
     args = parse_args()
 
     genome_rows = list(read_mosdepth_regions(args.genome_bed_gz))
-    if len(genome_rows) != 1:
-        raise ValueError(f"Expected one whole-genome mosdepth row in {args.genome_bed_gz}, found {len(genome_rows)}")
-    genome_row = genome_rows[0]
+    if not genome_rows:
+        raise ValueError(f"No whole-genome mosdepth rows found in {args.genome_bed_gz}")
     per_base_segments = read_per_base_segments(args.per_base_bed_gz)
-
-    genome_interval = {
-        "chrom": genome_row["chrom"],
-        "start": genome_row["start"],
-        "end": genome_row["end"],
-        "name": genome_row["name"],
-    }
-    reference_length, positions_covered, genome_coverage_pct, mean_depth = interval_coverage(
-        genome_interval, per_base_segments, args.min_depth
-    )
 
     with open(args.summary_output, "w", newline="") as handle:
         writer = csv.writer(handle, delimiter="\t")
@@ -102,17 +91,27 @@ def main():
                 "mean_depth",
             ]
         )
-        writer.writerow(
-            [
-                args.sample_id,
-                args.read_type,
-                args.reference_name,
-                reference_length,
-                positions_covered,
-                genome_coverage_pct,
-                mean_depth,
-            ]
-        )
+        for genome_row in genome_rows:
+            genome_interval = {
+                "chrom": genome_row["chrom"],
+                "start": genome_row["start"],
+                "end": genome_row["end"],
+                "name": genome_row["name"],
+            }
+            reference_length, positions_covered, genome_coverage_pct, mean_depth = interval_coverage(
+                genome_interval, per_base_segments, args.min_depth
+            )
+            writer.writerow(
+                [
+                    args.sample_id,
+                    args.read_type,
+                    genome_row["chrom"],
+                    reference_length,
+                    positions_covered,
+                    genome_coverage_pct,
+                    mean_depth,
+                ]
+            )
 
 
 if __name__ == "__main__":

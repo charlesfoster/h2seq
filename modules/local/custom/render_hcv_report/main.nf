@@ -8,7 +8,7 @@ process RENDER_HCV_REPORT {
         'quay.io/biocontainers/longqc:1.2.0c--hdfd78af_0' }"
 
     input:
-    tuple val(meta), path(best_reference_tsv), path(coverage_summary), path(depth_plot), path(feature_plot), path(hcv_coverage)
+    tuple val(meta), path(best_reference_tsv), path(coverage_summary), path(depth_plot), path(assignment_summary), path(feature_plot), path(hcv_coverage)
     path logo
     val pipeline_version
 
@@ -17,7 +17,7 @@ process RENDER_HCV_REPORT {
     path "versions.yml"                              , emit: versions
 
     script:
-    def prefix = task.ext.prefix ?: "${meta.id}"
+    def prefix = task.ext.prefix ?: "${meta.id}.${meta.reference_name}.${meta.component_role}"
     def readType = meta.long_reads ? 'long' : 'short'
     def snvMinAf = meta.long_reads ? params.ont_min_snv_af : params.illumina_min_snv_af
     def indelMinAf = meta.long_reads ? params.ont_min_indel_af : params.illumina_min_indel_af
@@ -30,7 +30,10 @@ process RENDER_HCV_REPORT {
         --sample-id ${meta.id} \\
         --read-type ${readType} \\
         --best-reference-tsv ${best_reference_tsv} \\
+        --reference-name "${meta.reference_name}" \\
+        --component-role "${meta.component_role}" \\
         --coverage-summary ${coverage_summary} \\
+        --assignment-summary ${assignment_summary} \\
         --depth-plot ${depth_plot} \\
         --feature-plot ${feature_plot} \\
         --hcv-coverage ${hcv_coverage} \\
@@ -53,7 +56,7 @@ process RENDER_HCV_REPORT {
     """
 
     stub:
-    def prefix = task.ext.prefix ?: "${meta.id}"
+    def prefix = task.ext.prefix ?: "${meta.id}.${meta.reference_name}.${meta.component_role}"
     def renderScriptMtime = file("${projectDir}/bin/render_hcv_report.py").lastModified()
     """
     # render_hcv_report_py_mtime=${renderScriptMtime}

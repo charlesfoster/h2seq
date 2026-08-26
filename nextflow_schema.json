@@ -351,6 +351,15 @@
                     "hidden": true,
                     "help_text": "Minimum depth for a base to be called in the consensus genome. Values less than `--consensus_min_depth` are filled with N"
                 },
+                "mixed_assignment_min_mapq": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "default": 10,
+                    "description": "Minimum mapping quality for assigning a fragment to one reference in a mixed infection.",
+                    "fa_icon": "fas fa-filter",
+                    "hidden": false,
+                    "help_text": "For multi-reference analyses, fragments below this mapping quality or with mates assigned to different references are excluded from genotype-specific coverage, consensus and variant calling. Single-reference samples are unchanged."
+                },
                 "qc_min_ref_coverage_pct": {
                     "type": "number",
                     "description": "Minimum percentage of the selected reference that must be covered at consensus depth for the sample to pass QC.",
