@@ -527,9 +527,20 @@ workflow H2SEQ {
     // Round 2 for both read types: build a majority-rules draft consensus from the
     // Round 1 BAM, then remap the original reads to that draft. This removes
     // panel-reference bias before variant calling without adding any new tool dependencies.
+    // The Round 1 reference is passed so uncovered positions are filled from it rather than N.
+    ch_draft_consensus_input_long = LONG_READ_MAPPING.out.consensus_bam
+        .map { meta, bam -> [meta.id, meta, bam] }
+        .combine(ch_best_ref_long.map { sample_id, _meta, fasta -> [sample_id, fasta] }, by: 0)
+        .map { _id, meta, bam, fasta -> [meta, bam, fasta] }
+
+    ch_draft_consensus_input_short = SHORT_READ_MAPPING.out.consensus_bam
+        .map { meta, bam -> [meta.id, meta, bam] }
+        .combine(ch_best_ref_short.map { sample_id, _meta, fasta -> [sample_id, fasta] }, by: 0)
+        .map { _id, meta, bam, fasta -> [meta, bam, fasta] }
+
     SAMTOOLS_CONSENSUS (
-        LONG_READ_MAPPING.out.consensus_bam
-            .mix(SHORT_READ_MAPPING.out.consensus_bam)
+        ch_draft_consensus_input_long
+            .mix(ch_draft_consensus_input_short)
     )
     ch_versions = ch_versions.mix(SAMTOOLS_CONSENSUS.out.versions)
 
