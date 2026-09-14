@@ -15,12 +15,13 @@ process PARSE_HCV_GLUE_COVERAGE {
     path "versions.yml"                             , emit: versions
 
     script:
-    def prefix = task.ext.prefix ?: "${meta.id}"
+    def prefix = task.ext.prefix ?: "${meta.id}.${meta.reference_name}.${meta.component_role}"
     def readType = meta.long_reads ? 'long' : 'short'
     """
     python3 ${projectDir}/bin/parse_hcv_glue_coverage.py \\
         --sample-id ${meta.id} \\
         --read-type ${readType} \\
+        --reference-name "${meta.reference_name}" \\
         --input ${report_html} \\
         --output ${prefix}.hcv_glue_coverage.tsv
 
@@ -31,13 +32,13 @@ process PARSE_HCV_GLUE_COVERAGE {
     """
 
     stub:
-    def prefix = task.ext.prefix ?: "${meta.id}"
+    def prefix = task.ext.prefix ?: "${meta.id}.${meta.reference_name}.${meta.component_role}"
     def readType = meta.long_reads ? 'long' : 'short'
     """
     cat <<-EOF > ${prefix}.hcv_glue_coverage.tsv
-    sample_id\tread_type\tfeature\tcoverage_pct
-    ${meta.id}\t${readType}\tPolyprotein\t99.0
-    ${meta.id}\t${readType}\tCore\t100.0
+    sample_id\tread_type\treference_name\tfeature\tcoverage_pct
+    ${meta.id}\t${readType}\t${meta.reference_name}\tPolyprotein\t99.0
+    ${meta.id}\t${readType}\t${meta.reference_name}\tCore\t100.0
     EOF
 
     cat <<-END_VERSIONS > versions.yml

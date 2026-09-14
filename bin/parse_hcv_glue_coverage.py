@@ -27,6 +27,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Parse HCV-GLUE HTML feature coverage into a TSV.")
     parser.add_argument("--sample-id", required=True)
     parser.add_argument("--read-type", required=True, choices=["long", "short"])
+    parser.add_argument("--reference-name", required=True)
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", required=True)
     return parser.parse_args()
@@ -59,9 +60,9 @@ def main():
 
     with open(args.output, "w", newline="") as handle:
         writer = csv.writer(handle, delimiter="\t")
-        writer.writerow(["sample_id", "read_type", "feature", "coverage_pct"])
+        writer.writerow(["sample_id", "read_type", "reference_name", "feature", "coverage_pct"])
         for feature in FEATURES:
-            writer.writerow([args.sample_id, args.read_type, feature, coverage.get(feature, "")])
+            writer.writerow([args.sample_id, args.read_type, args.reference_name, feature, coverage.get(feature, "")])
 
 
 if __name__ == "__main__":

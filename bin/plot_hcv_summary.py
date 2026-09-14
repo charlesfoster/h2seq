@@ -25,18 +25,20 @@ def parse_args():
     parser.add_argument("--sample-id", required=True)
     parser.add_argument("--read-type", required=True, choices=["long", "short"])
     parser.add_argument("--coverage-summary", required=True)
+    parser.add_argument("--reference-name", required=True)
     parser.add_argument("--hcv-coverage", required=True)
     parser.add_argument("--feature-plot-output", required=True)
     return parser.parse_args()
 
 
-def load_coverage_summary(path):
+def load_coverage_summary(path, reference_name):
     with open(path, newline="") as handle:
         reader = csv.DictReader(handle, delimiter="\t")
         rows = list(reader)
-    if len(rows) != 1:
-        raise ValueError(f"Expected one row in {path}, found {len(rows)}")
-    row = rows[0]
+    matching = [row for row in rows if row.get("reference_name") == reference_name]
+    if len(matching) != 1:
+        raise ValueError(f"Expected one {reference_name} row in {path}, found {len(matching)}")
+    row = matching[0]
     return {
         "genome_coverage_pct": float(row["genome_coverage_pct"]),
     }
@@ -76,7 +78,7 @@ def create_feature_plot(args, coverage_summary, feature_coverage):
 
 def main():
     args = parse_args()
-    coverage_summary = load_coverage_summary(args.coverage_summary)
+    coverage_summary = load_coverage_summary(args.coverage_summary, args.reference_name)
     feature_coverage = load_hcv_feature_coverage(args.hcv_coverage)
     create_feature_plot(args, coverage_summary, feature_coverage)
 

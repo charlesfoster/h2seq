@@ -1,0 +1,2 @@
+sample,long_reads,short_reads_1,short_reads_2
+mixed_gt,https://github.com/charlesfoster/h2seq/raw/refs/heads/dev/test-datasets/mixed_gt.fastq.gz,,

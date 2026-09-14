@@ -20,7 +20,7 @@ process GENERATE_WHOLE_GENOME_BED {
     script:
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    awk 'NR==1 { print \$1 "\\t0\\t" \$2 "\\twhole_genome" }' ${reference_fai} > ${prefix}.whole_genome.bed
+    awk '{ print \$1 "\\t0\\t" \$2 "\\twhole_genome" }' ${reference_fai} > ${prefix}.whole_genome.bed
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

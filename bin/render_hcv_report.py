@@ -4,16 +4,16 @@ import csv
 import textwrap
 from datetime import date
 
-import matplotlib.image as mpimg
-import matplotlib.pyplot as plt
-
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Render a one-page HCV PDF report.")
     parser.add_argument("--sample-id", required=True)
     parser.add_argument("--read-type", required=True, choices=["long", "short"])
     parser.add_argument("--best-reference-tsv", required=True)
+    parser.add_argument("--reference-name", required=True)
+    parser.add_argument("--component-role", required=True, choices=["main", "secondary"])
     parser.add_argument("--coverage-summary", required=True)
+    parser.add_argument("--assignment-summary", required=True)
     parser.add_argument("--depth-plot", required=True)
     parser.add_argument("--feature-plot")
     parser.add_argument("--hcv-coverage")
@@ -38,6 +38,38 @@ def read_single_tsv_row(path):
     if len(rows) != 1:
         raise ValueError(f"Expected one row in {path}, found {len(rows)}")
     return rows[0]
+
+
+def read_reference_coverage_row(path, reference_name):
+    with open(path, newline="") as handle:
+        rows = list(csv.DictReader(handle, delimiter="\t"))
+    matching = [row for row in rows if row.get("reference_name") == reference_name]
+    if len(matching) != 1:
+        raise ValueError(f"Expected one {reference_name} row in {path}, found {len(matching)}")
+    return matching[0]
+
+
+def reference_genotype_subtype(reference_name):
+    subtype = reference_name.split("_", 1)[0] if reference_name else ""
+    genotype = "".join(character for character in subtype if character.isdigit())
+    return genotype, subtype
+
+
+def read_assignment_stats(path, reference_name):
+    with open(path, newline="") as handle:
+        rows = list(csv.DictReader(handle, delimiter="\t"))
+    assigned = [row for row in rows if row.get("assignment") == "assigned"]
+    assigned_total = sum(int(float(row.get("fragments") or 0)) for row in assigned)
+    component = next((row for row in assigned if row.get("reference_name") == reference_name), {})
+    assigned_fragments = int(float(component.get("fragments") or 0))
+    ambiguous_fragments = sum(
+        int(float(row.get("fragments") or 0)) for row in rows if row.get("assignment") == "ambiguous"
+    )
+    return {
+        "assigned_fragments": assigned_fragments,
+        "assigned_fraction": assigned_fragments / assigned_total if assigned_total else 0.0,
+        "ambiguous_fragments": ambiguous_fragments,
+    }
 
 
 def hcv_coverage_is_empty(path):
@@ -73,7 +105,7 @@ def build_summary_sentence(args, coverage_is_missing=False):
     else:
         coverage_note = "A per-gene HCV coverage panel was not included because no HCV-GLUE result was available for this sample."
     return (
-        f"{args.sample_id} was analysed on {date.today().isoformat()} using version v{version} of the H2seq bioinformatics pipeline. "
+        f"The {args.component_role} {args.reference_name} component of {args.sample_id} was analysed on {date.today().isoformat()} using version v{version} of the H2seq bioinformatics pipeline. "
         f"{qc_description} A closest reference was selected from the configured reference panel based on a read mapping approach, "
         f"reads were aligned to that reference, SNVs were retained from a minimum depth of {args.consensus_min_depth} and minimum allele frequency of {snv_af_pct:.1f}%, "
         f"indels were retained using a minimum allele frequency of {indel_af_pct:.1f}%, and a consensus genome was assembled using a minimum consensus depth of {args.consensus_min_depth}. "
@@ -82,9 +114,14 @@ def build_summary_sentence(args, coverage_is_missing=False):
 
 
 def main():
+    import matplotlib.image as mpimg
+    import matplotlib.pyplot as plt
+
     args = parse_args()
     best_ref = read_single_tsv_row(args.best_reference_tsv)
-    coverage = read_single_tsv_row(args.coverage_summary)
+    coverage = read_reference_coverage_row(args.coverage_summary, args.reference_name)
+    assignment = read_assignment_stats(args.assignment_summary, args.reference_name)
+    genotype, subtype = reference_genotype_subtype(args.reference_name)
     coverage_is_missing = hcv_coverage_is_empty(args.hcv_coverage)
     logo = mpimg.imread(args.logo)
     depth_plot = mpimg.imread(args.depth_plot)
@@ -96,24 +133,28 @@ def main():
 
     ax_title = fig.add_subplot(gs[0:2, 0:8])
     ax_title.axis("off")
-    ax_title.text(0.0, 0.7, "H2seq Workflow Results", fontsize=18, fontweight="bold", ha="left", va="center")
+    ax_title.text(0.0, 0.7, "H2seq Component Results", fontsize=18, fontweight="bold", ha="left", va="center")
 
     ax_logo = fig.add_subplot(gs[0:2, 9:12])
     ax_logo.imshow(logo)
     ax_logo.axis("off")
 
-    ax_table = fig.add_subplot(gs[2:7, 0:12])
+    ax_table = fig.add_subplot(gs[2:10, 0:12])
     ax_table.axis("off")
     table_rows = [
         ["Date", date.today().isoformat()],
         ["Sample", args.sample_id],
-        ["Genotype", best_ref.get("genotype", "")],
-        ["Subtype", best_ref.get("subtype", "")],
-        ["Closest reference", best_ref.get("best_ref", "")],
+        ["Component", args.component_role],
+        ["Genotype", genotype],
+        ["Subtype", subtype],
+        ["Closest reference", args.reference_name],
+        ["Assigned fragments", f"{assignment['assigned_fragments']:,}"],
+        ["Assigned fraction", f"{assignment['assigned_fraction'] * 100.0:.2f}% of confidently assigned fragments"],
+        ["Ambiguous fragments", f"{assignment['ambiguous_fragments']:,} (excluded)"],
         ["Genome coverage", f"{float(coverage.get('genome_coverage_pct', 0.0)):.1f}%"],
         ["Mean depth", f"{float(coverage.get('mean_depth', 0.0)):.1f}x"],
     ]
-    table = ax_table.table(cellText=table_rows, colWidths=[0.25, 0.75], cellLoc="left", loc="center")
+    table = ax_table.table(cellText=table_rows, colWidths=[0.29, 0.71], cellLoc="left", loc="center")
     table.auto_set_font_size(False)
     table.set_fontsize(10)
     table.scale(1, 1.5)
@@ -126,13 +167,13 @@ def main():
             cell.set_facecolor("#f7f9fc")
 
     if args.include_feature_plot:
-        depth_rows = slice(7, 14)
-        feature_rows = slice(14, 21)
-        footer_rows = slice(21, 28)
+        depth_rows = slice(10, 16)
+        feature_rows = slice(16, 22)
+        footer_rows = slice(22, 28)
     else:
-        depth_rows = slice(7, 17)
+        depth_rows = slice(10, 19)
         feature_rows = None
-        footer_rows = slice(17, 28)
+        footer_rows = slice(19, 28)
 
     ax_plot1 = fig.add_subplot(gs[depth_rows, 0:12])
     ax_plot1.imshow(depth_plot)

@@ -61,8 +61,15 @@ Present when primer trimming is used. Contains intermediate files related to pri
 Typical contents:
 
 - `*.coverage_summary.tsv`
+- `*.mixed_assignment.tsv`, containing uniquely assigned, ambiguous, and unassigned fragment counts after competitive mapping
 - `*.hcv_glue_coverage.tsv` parsed from the HCV-GLUE HTML report for HCV runs with `--run_hcv_glue`
 - `*.mapped_read_count.txt`
+
+For samples with more than one retained reference, coverage is reported separately
+for every reference. Fragments are assigned using the primary alignments of the read
+or read pair. Fragments below `--mixed_assignment_min_mapq`, or pairs whose primary
+alignments point to different references, are counted as ambiguous and do not
+contribute to genotype-specific coverage, variant calling, or consensus generation.
 
 ### `consensus`
 
@@ -95,14 +102,19 @@ Contains the aggregated MultiQC report. The report now includes native modules f
 
 It also includes an `h2seq Run Summary` custom section built from the final run summary table.
 
-### `run_summary/`
+### Run summary tables
 
-Contains:
+The top-level results directory contains:
 
-- `run_summary.csv`
-- `run_summary_mqc.json`
+- `combined_results_summary.csv`
+- `reference_component_summary.csv`
 
-`run_summary.csv` is the main per-sample summary table. Depending on the run, columns can include:
+`combined_results_summary.csv` has one row per sample and read type. For a mixed
+infection, its coverage and mean depth describe the selected main reference only;
+`mixed_infection`, `secondary_subtypes`, and `component_fractions` describe the
+final competitively assigned components. The preliminary selection-stage mixture
+score remains available only in `*.best_reference.tsv` for diagnostic purposes.
+Depending on the run, columns can include:
 
 - designated genotype and subtype
 - chosen mapping reference
@@ -115,6 +127,18 @@ Contains:
 - notes describing skipped or failed sample-level outcomes
 
 Rows are emitted even for samples that stop early because they have no usable reads. Samples are marked `qc_fail` when they have no primary mapped reads, when less than `--qc_min_ref_coverage_pct` of the selected reference is covered at `--consensus_min_depth`, or when the main consensus is all `N` and cannot be sent to HCV-GLUE. Genotype/subtype calls for QC-failed samples are blanked in the combined summary and flagged as unreliable.
+
+`reference_component_summary.csv` has one row per retained reference component.
+It identifies each component as `main` or `secondary` and reports its own genome
+coverage, mean depth, HCV polyprotein coverage where available, uniquely assigned
+fragment count and fraction of confidently assigned fragments, together with the
+sample-level ambiguous and unassigned fragment counts. This is the table to use when
+comparing the coverage of genotype 1a and genotype 3a in the same sample.
+
+Mixed infections produce a separate component PDF for the main and every retained
+secondary reference. Filenames include the reference and component role. Each PDF
+contains component-specific depth, coverage, assignment statistics, consensus
+interpretation, and HCV-GLUE feature coverage where available.
 
 ### `all_consensus_genomes/`
 

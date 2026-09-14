@@ -17,21 +17,20 @@ process BCFTOOLS_CONSENSUS {
 
     script:
     def prefix = task.ext.prefix ?: "${meta.id}"
-    def headerLabel = meta.reference_name ? "${prefix} ${meta.reference_name}" : prefix
     """
     bcftools consensus \\
         -f $fasta \\
         -m $mask_bed \\
         --mark-del '-' \\
         -H I \\
-        $vcf | sed "/^>/s/.*/>${headerLabel}/" > ${prefix}.consensus.fa
+        $vcf | awk -v p="${prefix}" '/^>/{print ">" p " " substr(\$0,2); next}{print}' > ${prefix}.consensus.fa
 
     bcftools consensus \\
         -f $fasta \\
         -m $mask_bed \\
         --mark-del '-' \\
         -H 1 \\
-        $simple_vcf | sed "/^>/s/.*/>${headerLabel}/" > ${prefix}.consensus_simple.fa
+        $simple_vcf | awk -v p="${prefix}" '/^>/{print ">" p " " substr(\$0,2); next}{print}' > ${prefix}.consensus_simple.fa
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
