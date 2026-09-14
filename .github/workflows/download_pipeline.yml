@@ -37,8 +37,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: configure
     steps:
+      # Nextflow 26.04.x crashes in `nextflow config -o json` when closures referencing `meta` sit inside a
+      # publishDir list (nextflow-io/nextflow#7375). Revert to the default once a stable release includes the fix.
       - name: Install Nextflow
         uses: nf-core/setup-nextflow@v2
+        with:
+          version: "26.08.0-edge"
 
       - name: Disk space cleanup
         uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
