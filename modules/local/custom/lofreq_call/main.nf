@@ -23,13 +23,25 @@ process LOFREQ_CALL {
     script:
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    lofreq call-parallel \\
+    # call-parallel's internal bcftools concat can segfault when the per-region
+    # chunk VCFs are empty (e.g. BAMs with only a handful of reads), so fall back
+    # to serial lofreq call if the parallel run fails.
+    if ! lofreq call-parallel \\
         --no-baq \\
         --call-indels \\
         --pp-threads ${task.cpus} \\
         -f $fasta \\
         -o ${prefix}.lofreq.raw.vcf \\
-        $bam
+        $bam; then
+        echo "WARNING: lofreq call-parallel failed; retrying with serial lofreq call" >&2
+        rm -f ${prefix}.lofreq.raw.vcf
+        lofreq call \\
+            --no-baq \\
+            --call-indels \\
+            -f $fasta \\
+            -o ${prefix}.lofreq.raw.vcf \\
+            $bam
+    fi
 
     bgzip -c ${prefix}.lofreq.raw.vcf > ${prefix}.lofreq.raw.vcf.gz
     tabix -f -p vcf ${prefix}.lofreq.raw.vcf.gz
