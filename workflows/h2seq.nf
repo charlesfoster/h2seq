@@ -128,6 +128,16 @@ def parseMappedReadCount(countFile) {
 }
 
 
+// Pair each output file with the relative path (<sample>/<short_reads|long_reads>/<file name>) it
+// has in the published results, which is how the summary scripts infer sample ID and read type.
+def summaryInputPaths(meta, files) {
+    def read_dir = meta.long_reads ? 'long_reads' : 'short_reads'
+    return (files instanceof Collection ? files : [files]).collect { file ->
+        ["${meta.id}/${read_dir}/${file.name}".toString(), file]
+    }
+}
+
+
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     RUN MAIN WORKFLOW
@@ -1082,40 +1092,40 @@ workflow H2SEQ {
         ch_versions = ch_versions.mix(RENDER_SUMMARY_REPORT.out.versions)
     }
 
-    ch_summary_triggers = COVERAGE_METRICS.out.summary
-        .mix(ch_split_consensuses)
-        .mix(ch_simple_split_consensuses)
-        .mix(ch_hcv_reports)
-        .mix(NANOQ.out.stats)
+    // Stage the files read by BUILD_RUN_SUMMARY and BUILD_MULTIQC_SECTIONS into the tasks as real
+    // inputs (rather than reading the published output directory, which is not visible inside
+    // containers when --outdir is outside the project directory). Each item is
+    // [ "<sample>/<short_reads|long_reads>/<file name>", file ]; the processes rebuild this layout.
+    ch_summary_inputs = COVERAGE_METRICS.out.summary
         .mix(FASTP.out.json)
         .mix(ch_long_raw_stats)
         .mix(ch_long_clean_stats)
         .mix(ch_short_raw_stats)
         .mix(ch_short_clean_stats)
-        .mix(COUNT_MAPPED_READS.out.txt)
         .mix(FILTER_MIXED_REFERENCE_ALIGNMENTS.out.summary)
-
-    ch_summary_triggers = ch_summary_triggers.mix(ch_best_ref_tsv)
-    ch_summary_triggers = ch_summary_triggers
-        .mix(PLOT_DEPTH_SUMMARY.out.depth)
-        .mix(RENDER_SUMMARY_REPORT.out.pdf)
+        .mix(ch_best_ref_tsv)
+        .mix(MOSDEPTH_GENOME.out.per_base_bed)
+        .mix(ANNOTATE_VARIANTS.out.tsv)
     if (params.run_hcv_glue) {
-        ch_summary_triggers = ch_summary_triggers
+        ch_summary_inputs = ch_summary_inputs
             .mix(REMOVE_EMPTY_SEQUENCES.out.empty_fasta)
             .mix(PARSE_HCV_GLUE_COVERAGE.out.tsv)
-            .mix(PLOT_HCV_SUMMARY.out.feature)
-            .mix(RENDER_HCV_REPORT.out.pdf)
     }
 
+    // toList() (unlike collect()) emits [] on an empty channel, so the summary processes
+    // still run and write header-only outputs
+    ch_summary_staged = ch_summary_inputs
+        .flatMap { meta, files -> summaryInputPaths(meta, files) }
+        .toList()
+        .map { items -> [ items.collect { item -> item[0] }, items.collect { item -> item[1] } ] }
+
     BUILD_RUN_SUMMARY (
-        ch_summary_triggers.collect(),
-        file(params.outdir).toString(),
+        ch_summary_staged,
         workflow.manifest.version ?: ""
     )
 
     BUILD_MULTIQC_SECTIONS (
-        ch_summary_triggers.collect(),
-        file(params.outdir).toString()
+        ch_summary_staged
     )
 
     /*

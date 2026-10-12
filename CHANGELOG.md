@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Low-frequency mixed Illumina SNVs (below `--illumina_iupac_min_af` or supported by fewer than `--illumina_iupac_min_alt_reads` reads) are still reported in `*.final.vcf.gz` but no longer produce IUPAC codes in the consensus
 
+### `Fixed`
+
+- Run summary and MultiQC section builders now receive their inputs as staged files instead of reading the published output directory, which was invisible inside containers when `--outdir` was outside the project directory, producing empty summaries
+
 ## v0.3.0 - [2026-04-30]
 
 ### `Added`
