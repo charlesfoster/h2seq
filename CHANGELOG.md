@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional duplicate marking (`--mark_duplicates`) for Illumina alignments using `samtools fixmate`/`markdup`, with duplicate statistics published to `qc_metrics`
 - Separate thresholds for writing IUPAC ambiguity codes into the IUPAC consensus: `--illumina_iupac_min_af`, `--ont_iupac_min_af`, `--illumina_iupac_min_alt_reads` and `--ont_iupac_min_alt_reads`
 - `*.final_consensus.vcf.gz` output, the subset of `*.final.vcf.gz` applied to the IUPAC consensus
+- `twist` profile for Twist hybrid-capture Illumina data (skips primer trimming and marks duplicates)
 
 ### `Changed`
 
