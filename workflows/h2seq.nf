@@ -53,6 +53,7 @@ include { BUILD_RUN_SUMMARY         } from '../modules/local/custom/build_run_su
 include { BUILD_MULTIQC_SECTIONS    } from '../modules/local/custom/build_multiqc_sections/main'
 include { COUNT_MAPPED_READS        } from '../modules/local/custom/count_mapped_reads/main'
 include { FILTER_MIXED_REFERENCE_ALIGNMENTS } from '../modules/local/custom/filter_mixed_reference_alignments/main'
+include { SAMTOOLS_MARKDUP } from '../modules/local/custom/samtools_markdup/main'
 include { REFERENCE_METADATA_FROM_FASTA } from '../modules/local/custom/reference_metadata_from_fasta/main'
 include { GENERATE_WHOLE_GENOME_BED } from '../modules/local/custom/generate_whole_genome_bed/main'
 include { LOFREQ_INDELQUAL          } from '../modules/local/custom/lofreq_indelqual/main'
@@ -565,9 +566,31 @@ workflow H2SEQ {
     )
     ch_versions = ch_versions.mix(FILTER_MIXED_REFERENCE_ALIGNMENTS.out.versions)
 
-    ch_consensus_bam = FILTER_MIXED_REFERENCE_ALIGNMENTS.out.bam
+    // Optionally flag (never remove) PCR/optical duplicates in short-read BAMs.
+    // LoFreq and mosdepth ignore duplicate-flagged reads by default (mosdepth -F 1796;
+    // LoFreq 2.1.5 verified empirically to skip them), so marking affects both variant
+    // calling and the depth used for the consensus mask. Long-read BAMs are left untouched.
+    if (params.mark_duplicates) {
+        ch_filtered_bam_by_type = FILTER_MIXED_REFERENCE_ALIGNMENTS.out.bam
+            .branch { meta, _bam, _idx ->
+                long_reads: meta.long_reads
+                short_reads: true
+            }
+
+        SAMTOOLS_MARKDUP (
+            ch_filtered_bam_by_type.short_reads.map { meta, bam, _idx -> [meta, bam] }
+        )
+        ch_versions = ch_versions.mix(SAMTOOLS_MARKDUP.out.versions)
+
+        ch_consensus_bam_with_idx = ch_filtered_bam_by_type.long_reads
+            .mix(SAMTOOLS_MARKDUP.out.bam)
+    } else {
+        ch_consensus_bam_with_idx = FILTER_MIXED_REFERENCE_ALIGNMENTS.out.bam
+    }
+
+    ch_consensus_bam = ch_consensus_bam_with_idx
         .map { meta, bam, _idx -> [meta, bam] }
-    ch_consensus_bam_idx = FILTER_MIXED_REFERENCE_ALIGNMENTS.out.bam
+    ch_consensus_bam_idx = ch_consensus_bam_with_idx
         .map { meta, _bam, idx -> [meta, idx] }
 
     COUNT_MAPPED_READS (
@@ -770,7 +793,9 @@ workflow H2SEQ {
         [meta.id, meta.long_reads, meta, simple_vcf, simple_vcf_idx]
     }.set { ch_simple_vcf_input }
 
-    ch_bcftools_consensus_input = FILTER_VARIANTS.out.vcf
+    // The IUPAC consensus uses the consensus VCF (weakly supported mixed sites removed);
+    // annotation and reporting above use the full final VCF.
+    ch_bcftools_consensus_input = FILTER_VARIANTS.out.consensus_vcf
         .map { meta, vcf, vcf_idx ->
             [meta.id, meta.long_reads, meta, vcf, vcf_idx]
         }

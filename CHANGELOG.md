@@ -3,6 +3,18 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### `Added`
+
+- Optional duplicate marking (`--mark_duplicates`) for Illumina alignments using `samtools fixmate`/`markdup`, with duplicate statistics published to `qc_metrics`
+- Separate thresholds for writing IUPAC ambiguity codes into the IUPAC consensus: `--illumina_iupac_min_af`, `--ont_iupac_min_af`, `--illumina_iupac_min_alt_reads` and `--ont_iupac_min_alt_reads`
+- `*.final_consensus.vcf.gz` output, the subset of `*.final.vcf.gz` applied to the IUPAC consensus
+
+### `Changed`
+
+- Low-frequency mixed Illumina SNVs (below `--illumina_iupac_min_af` or supported by fewer than `--illumina_iupac_min_alt_reads` reads) are still reported in `*.final.vcf.gz` but no longer produce IUPAC codes in the consensus
+
 ## v0.3.0 - [2026-04-30]
 
 ### `Added`
