@@ -444,9 +444,9 @@
                 "clair3_model_path": {
                     "type": "string",
                     "description": "Path to directory containing a Clair3 model for variant calling.",
-                    "default": "/opt/models/r1041_e82_400bps_sup_v410",
+                    "default": "/opt/models/r1041_e82_400bps_sup_v520",
                     "hidden": false,
-                    "help_text": "Default is set to the pre-downloaded model for ONT R10 chemistry with SUP basecalling in the Clair3 container/environment. If using a different model, give the full path to a Clair3 model directory (requiring six files in the folder, including pileup.data-00000-of-00002, pileup.data-00001-of-00002 pileup.index, full_alignment.data-00000-of-00002, full_alignment.data-00001-of-00002 and full_alignment.index) ",
+                    "help_text": "Default is set to the pre-downloaded model for ONT R10.4.1 (e8.2, 400 bps) chemistry with SUP basecalling (v5.2.0 models) in the Clair3 container/environment. If using a different model, give the full path to a Clair3 (v2) model directory containing the two PyTorch model files `pileup.pt` and `full_alignment.pt`. Other models shipped in the container are listed under `/opt/models`.",
                     "fa_icon": "fas fa-question-circle"
                 },
                 "clair3_platform": {

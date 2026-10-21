@@ -3,6 +3,12 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### `Changed`
+
+- Updated Clair3 from 1.1.1 to 2.0.3 (Docker, Singularity and conda) and changed the default `--clair3_model_path` to `/opt/models/r1041_e82_400bps_sup_v520`. Custom Clair3 models must now be v2 (PyTorch) model directories containing `pileup.pt` and `full_alignment.pt`
+
 ## v0.3.0 - [2026-04-30]
 
 ### `Added`
