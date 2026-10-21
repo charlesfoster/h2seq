@@ -53,6 +53,7 @@ include { BUILD_RUN_SUMMARY         } from '../modules/local/custom/build_run_su
 include { BUILD_MULTIQC_SECTIONS    } from '../modules/local/custom/build_multiqc_sections/main'
 include { COUNT_MAPPED_READS        } from '../modules/local/custom/count_mapped_reads/main'
 include { FILTER_MIXED_REFERENCE_ALIGNMENTS } from '../modules/local/custom/filter_mixed_reference_alignments/main'
+include { SAMTOOLS_MARKDUP } from '../modules/local/custom/samtools_markdup/main'
 include { REFERENCE_METADATA_FROM_FASTA } from '../modules/local/custom/reference_metadata_from_fasta/main'
 include { GENERATE_WHOLE_GENOME_BED } from '../modules/local/custom/generate_whole_genome_bed/main'
 include { LOFREQ_INDELQUAL          } from '../modules/local/custom/lofreq_indelqual/main'
@@ -123,6 +124,16 @@ def parseMappedReadCount(countFile) {
         return raw as Long
     } catch (NumberFormatException e) {
         throw new IllegalStateException("Non-numeric mapped read count in ${countFile}: ${raw}", e)
+    }
+}
+
+
+// Pair each output file with the relative path (<sample>/<short_reads|long_reads>/<file name>) it
+// has in the published results, which is how the summary scripts infer sample ID and read type.
+def summaryInputPaths(meta, files) {
+    def read_dir = meta.long_reads ? 'long_reads' : 'short_reads'
+    return (files instanceof Collection ? files : [files]).collect { file ->
+        ["${meta.id}/${read_dir}/${file.name}".toString(), file]
     }
 }
 
@@ -527,9 +538,20 @@ workflow H2SEQ {
     // Round 2 for both read types: build a majority-rules draft consensus from the
     // Round 1 BAM, then remap the original reads to that draft. This removes
     // panel-reference bias before variant calling without adding any new tool dependencies.
+    // The Round 1 reference is passed so uncovered positions are filled from it rather than N.
+    ch_draft_consensus_input_long = LONG_READ_MAPPING.out.consensus_bam
+        .map { meta, bam -> [meta.id, meta, bam] }
+        .combine(ch_best_ref_long.map { sample_id, _meta, fasta -> [sample_id, fasta] }, by: 0)
+        .map { _id, meta, bam, fasta -> [meta, bam, fasta] }
+
+    ch_draft_consensus_input_short = SHORT_READ_MAPPING.out.consensus_bam
+        .map { meta, bam -> [meta.id, meta, bam] }
+        .combine(ch_best_ref_short.map { sample_id, _meta, fasta -> [sample_id, fasta] }, by: 0)
+        .map { _id, meta, bam, fasta -> [meta, bam, fasta] }
+
     SAMTOOLS_CONSENSUS (
-        LONG_READ_MAPPING.out.consensus_bam
-            .mix(SHORT_READ_MAPPING.out.consensus_bam)
+        ch_draft_consensus_input_long
+            .mix(ch_draft_consensus_input_short)
     )
     ch_versions = ch_versions.mix(SAMTOOLS_CONSENSUS.out.versions)
 
@@ -554,9 +576,31 @@ workflow H2SEQ {
     )
     ch_versions = ch_versions.mix(FILTER_MIXED_REFERENCE_ALIGNMENTS.out.versions)
 
-    ch_consensus_bam = FILTER_MIXED_REFERENCE_ALIGNMENTS.out.bam
+    // Optionally flag (never remove) PCR/optical duplicates in short-read BAMs.
+    // LoFreq and mosdepth ignore duplicate-flagged reads by default (mosdepth -F 1796;
+    // LoFreq 2.1.5 verified empirically to skip them), so marking affects both variant
+    // calling and the depth used for the consensus mask. Long-read BAMs are left untouched.
+    if (params.mark_duplicates) {
+        ch_filtered_bam_by_type = FILTER_MIXED_REFERENCE_ALIGNMENTS.out.bam
+            .branch { meta, _bam, _idx ->
+                long_reads: meta.long_reads
+                short_reads: true
+            }
+
+        SAMTOOLS_MARKDUP (
+            ch_filtered_bam_by_type.short_reads.map { meta, bam, _idx -> [meta, bam] }
+        )
+        ch_versions = ch_versions.mix(SAMTOOLS_MARKDUP.out.versions)
+
+        ch_consensus_bam_with_idx = ch_filtered_bam_by_type.long_reads
+            .mix(SAMTOOLS_MARKDUP.out.bam)
+    } else {
+        ch_consensus_bam_with_idx = FILTER_MIXED_REFERENCE_ALIGNMENTS.out.bam
+    }
+
+    ch_consensus_bam = ch_consensus_bam_with_idx
         .map { meta, bam, _idx -> [meta, bam] }
-    ch_consensus_bam_idx = FILTER_MIXED_REFERENCE_ALIGNMENTS.out.bam
+    ch_consensus_bam_idx = ch_consensus_bam_with_idx
         .map { meta, _bam, idx -> [meta, idx] }
 
     COUNT_MAPPED_READS (
@@ -759,7 +803,9 @@ workflow H2SEQ {
         [meta.id, meta.long_reads, meta, simple_vcf, simple_vcf_idx]
     }.set { ch_simple_vcf_input }
 
-    ch_bcftools_consensus_input = FILTER_VARIANTS.out.vcf
+    // The IUPAC consensus uses the consensus VCF (weakly supported mixed sites removed);
+    // annotation and reporting above use the full final VCF.
+    ch_bcftools_consensus_input = FILTER_VARIANTS.out.consensus_vcf
         .map { meta, vcf, vcf_idx ->
             [meta.id, meta.long_reads, meta, vcf, vcf_idx]
         }
@@ -1046,40 +1092,40 @@ workflow H2SEQ {
         ch_versions = ch_versions.mix(RENDER_SUMMARY_REPORT.out.versions)
     }
 
-    ch_summary_triggers = COVERAGE_METRICS.out.summary
-        .mix(ch_split_consensuses)
-        .mix(ch_simple_split_consensuses)
-        .mix(ch_hcv_reports)
-        .mix(NANOQ.out.stats)
+    // Stage the files read by BUILD_RUN_SUMMARY and BUILD_MULTIQC_SECTIONS into the tasks as real
+    // inputs (rather than reading the published output directory, which is not visible inside
+    // containers when --outdir is outside the project directory). Each item is
+    // [ "<sample>/<short_reads|long_reads>/<file name>", file ]; the processes rebuild this layout.
+    ch_summary_inputs = COVERAGE_METRICS.out.summary
         .mix(FASTP.out.json)
         .mix(ch_long_raw_stats)
         .mix(ch_long_clean_stats)
         .mix(ch_short_raw_stats)
         .mix(ch_short_clean_stats)
-        .mix(COUNT_MAPPED_READS.out.txt)
         .mix(FILTER_MIXED_REFERENCE_ALIGNMENTS.out.summary)
-
-    ch_summary_triggers = ch_summary_triggers.mix(ch_best_ref_tsv)
-    ch_summary_triggers = ch_summary_triggers
-        .mix(PLOT_DEPTH_SUMMARY.out.depth)
-        .mix(RENDER_SUMMARY_REPORT.out.pdf)
+        .mix(ch_best_ref_tsv)
+        .mix(MOSDEPTH_GENOME.out.per_base_bed)
+        .mix(ANNOTATE_VARIANTS.out.tsv)
     if (params.run_hcv_glue) {
-        ch_summary_triggers = ch_summary_triggers
+        ch_summary_inputs = ch_summary_inputs
             .mix(REMOVE_EMPTY_SEQUENCES.out.empty_fasta)
             .mix(PARSE_HCV_GLUE_COVERAGE.out.tsv)
-            .mix(PLOT_HCV_SUMMARY.out.feature)
-            .mix(RENDER_HCV_REPORT.out.pdf)
     }
 
+    // toList() (unlike collect()) emits [] on an empty channel, so the summary processes
+    // still run and write header-only outputs
+    ch_summary_staged = ch_summary_inputs
+        .flatMap { meta, files -> summaryInputPaths(meta, files) }
+        .toList()
+        .map { items -> [ items.collect { item -> item[0] }, items.collect { item -> item[1] } ] }
+
     BUILD_RUN_SUMMARY (
-        ch_summary_triggers.collect(),
-        file(params.outdir).toString(),
+        ch_summary_staged,
         workflow.manifest.version ?: ""
     )
 
     BUILD_MULTIQC_SECTIONS (
-        ch_summary_triggers.collect(),
-        file(params.outdir).toString()
+        ch_summary_staged
     )
 
     /*

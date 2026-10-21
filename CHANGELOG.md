@@ -3,6 +3,25 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.6.0 - [Unreleased]
+
+### `Added`
+
+- Optional duplicate marking (`--mark_duplicates`) for Illumina alignments using `samtools fixmate`/`markdup`, with duplicate statistics published to `qc_metrics`
+- Separate thresholds for writing IUPAC ambiguity codes into the IUPAC consensus: `--illumina_iupac_min_af`, `--ont_iupac_min_af`, `--illumina_iupac_min_alt_reads` and `--ont_iupac_min_alt_reads`
+- `*.final_consensus.vcf.gz` output, the subset of `*.final.vcf.gz` applied to the IUPAC consensus
+- `twist` profile for Twist hybrid-capture Illumina data (skips primer trimming and marks duplicates)
+
+### `Changed`
+
+- Updated Clair3 from 1.1.1 to 2.0.3 (Docker, Singularity and conda) and changed the default `--clair3_model_path` to `/opt/models/r1041_e82_400bps_sup_v520`. Custom Clair3 models must now be v2 (PyTorch) model directories containing `pileup.pt` and `full_alignment.pt`
+- Low-frequency mixed Illumina SNVs (below `--illumina_iupac_min_af` or supported by fewer than `--illumina_iupac_min_alt_reads` reads) are still reported in `*.final.vcf.gz` but no longer produce IUPAC codes in the consensus
+
+### `Fixed`
+
+- Disabled the catch-all `publishDir` default so processes without their own publish rule no longer create stray top-level directories in `--outdir` (e.g. `compress/` containing the prepared LoFreq VCF)
+- Run summary and MultiQC section builders now receive their inputs as staged files instead of reading the published output directory, which was invisible inside containers when `--outdir` was outside the project directory, producing empty summaries
+
 ## v0.3.0 - [2026-04-30]
 
 ### `Added`

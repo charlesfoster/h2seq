@@ -8,8 +8,7 @@ process BUILD_MULTIQC_SECTIONS {
         'quay.io/biocontainers/longqc:1.2.0c--hdfd78af_0' }"
 
     input:
-    val trigger_files
-    val outdir
+    tuple val(rels), path(files, stageAs: 'staged_inputs/?/*')
 
     output:
     path "coverage_statistics_mqc.json", emit: coverage
@@ -22,12 +21,22 @@ process BUILD_MULTIQC_SECTIONS {
     task.ext.when == null || task.ext.when
 
     script:
+    def rel_words = rels.collect { rel -> "'" + rel.toString().replace("'", "'\\''") + "'" }.join(' ')
     """
     export MPLCONFIGDIR=\$PWD/.mplconfig
     export XDG_CACHE_HOME=\$PWD/.cache
 
+    # Rebuild <sample>/<read_type>/<file> from the staged inputs (staged_inputs/N is the Nth entry of rels)
+    mkdir -p staged_outdir
+    n=0
+    for rel in ${rel_words}; do
+        n=\$((n + 1))
+        mkdir -p "staged_outdir/\$(dirname "\$rel")"
+        ln -sf "\$PWD/staged_inputs/\$n/\$(basename "\$rel")" "staged_outdir/\$rel"
+    done
+
     python3 ${projectDir}/bin/build_multiqc_sections.py \\
-        --outdir "${outdir}" \\
+        --outdir staged_outdir \\
         --coverage-output coverage_statistics_mqc.json \\
         --region-coverage-output region_coverage_mqc.json \\
         --region-coverage-pdf-output coverage_per_genomic_region.pdf \\

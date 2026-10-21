@@ -4,8 +4,8 @@ process CLAIR3 {
 
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/clair3:1.1.1--py310h779eee5_0' :
-        'docker.io/hkubal/clair3:v1.1.1' }"
+        'https://depot.galaxyproject.org/singularity/clair3:2.0.3--py311hbc58adc_0' :
+        'docker.io/hkubal/clair3:v2.0.3' }"
 
     input:
     tuple val(meta), path(bam), path(bam_index), path(fasta), path(fai)

@@ -12,6 +12,7 @@ process FILTER_VARIANTS {
 
     output:
     tuple val(meta), path("*.final.vcf.gz"), path("*.final.vcf.gz.csi")                 , emit: vcf
+    tuple val(meta), path("*.final_consensus.vcf.gz"), path("*.final_consensus.vcf.gz.csi"), emit: consensus_vcf
     tuple val(meta), path("*.final_simple.vcf.gz"), path("*.final_simple.vcf.gz.csi")   , emit: simple_vcf
     path "versions.yml"                                                                 , emit: versions
 
@@ -20,6 +21,15 @@ process FILTER_VARIANTS {
     def minQual = meta.long_reads ? params.ont_variant_min_qual : params.illumina_variant_min_qual
     def minSnvAf = meta.long_reads ? params.ont_min_snv_af : params.illumina_min_snv_af
     def minIndelAf = meta.long_reads ? params.ont_min_indel_af : params.illumina_min_indel_af
+    def iupacMinAf = meta.long_reads ? params.ont_iupac_min_af : params.illumina_iupac_min_af
+    def iupacMinAltReads = meta.long_reads ? params.ont_iupac_min_alt_reads : params.illumina_iupac_min_alt_reads
+    // Mixed (GT 0/1) SNP sites that are too weakly supported are kept in final.vcf.gz (reported) but are not
+    // IUPAC-encoded in the consensus. Alt reads are estimated as DP*AF; the 0.5 offset guards against float error.
+    def iupacMinAltReadsNum = iupacMinAltReads as Double
+    def weakMixedCond = "INFO/AF < ${iupacMinAf}"
+    if (iupacMinAltReadsNum > 0) {
+        weakMixedCond += " || INFO/DP*INFO/AF < ${iupacMinAltReadsNum - 0.5}"
+    }
     """
     bcftools index -f $vcf
     bcftools +fill-tags $vcf -Ou -- -t TYPE | \\
@@ -32,6 +42,10 @@ process FILTER_VARIANTS {
         bcftools +setGT -Ou -- -t q -i 'TYPE="indel" && INFO/AF < ${minIndelAf}' -n . | \\
         bcftools +setGT -Oz -o ${prefix}.final.vcf.gz -- -t q -i 'GT="1/1" && INFO/AF >= ${params.consensus_call_af}' -n 'c:1/1'
     bcftools index -f ${prefix}.final.vcf.gz
+
+    # VCF used only for the IUPAC consensus: drop weakly supported mixed SNP sites (fixed sites and indels are untouched)
+    bcftools view -e 'GT="het" && TYPE="snp" && (${weakMixedCond})' -Oz -o ${prefix}.final_consensus.vcf.gz ${prefix}.final.vcf.gz
+    bcftools index -f ${prefix}.final_consensus.vcf.gz
 
     bcftools +fill-tags $vcf -Ou -- -t TYPE | \\
         bcftools norm -Ou -a -m - | \\
@@ -52,6 +66,8 @@ process FILTER_VARIANTS {
     """
     touch ${prefix}.final.vcf.gz
     touch ${prefix}.final.vcf.gz.csi
+    touch ${prefix}.final_consensus.vcf.gz
+    touch ${prefix}.final_consensus.vcf.gz.csi
     touch ${prefix}.final_simple.vcf.gz
     touch ${prefix}.final_simple.vcf.gz.csi
 
