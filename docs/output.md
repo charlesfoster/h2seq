@@ -86,6 +86,16 @@ Contains intermediate and final files from the variant-calling and consensus wor
 
 The workflow always builds both an IUPAC ambiguity consensus and a simple majority-allele consensus. The simple consensus incorporates variants with allele frequency `>= 0.5` and is used for downstream reporting steps such as HCV-GLUE.
 
+Typical contents include:
+
+- `*.final.vcf.gz`, containing every SNV and indel that passed filtering, including low-frequency mixed sites (`--ont_min_snv_af` / `--illumina_min_snv_af` and up). This is the VCF that is annotated and reported.
+- `*.final_consensus.vcf.gz`, the subset of `*.final.vcf.gz` that is applied to the IUPAC consensus. Mixed SNV sites are dropped from it if their allele frequency is below `--ont_iupac_min_af` / `--illumina_iupac_min_af` or if they are supported by fewer than `--ont_iupac_min_alt_reads` / `--illumina_iupac_min_alt_reads` alternate reads (estimated as `DP * AF`). Fixed variants (`AF >= --consensus_call_af`) and indels are always kept.
+- `*.final_simple.vcf.gz`, the variants (`AF >= 0.5`) applied to the simple majority-allele consensus.
+
+A mixed site that appears in `*.final.vcf.gz` but not in `*.final_consensus.vcf.gz` is therefore reported as a low-frequency variant but does not produce an IUPAC code in the consensus.
+
+When `--mark_duplicates` is enabled for Illumina data, `*.markdup_stats.txt` (from `samtools markdup`) is written to the `qc_metrics` directory. Duplicate-flagged reads are ignored by LoFreq and by the depth calculation used for consensus masking.
+
 ### `reporting`
 
 Present when optional reporting steps are enabled, most notably `HCV-GLUE`.

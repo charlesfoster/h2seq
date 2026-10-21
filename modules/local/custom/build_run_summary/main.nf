@@ -8,8 +8,7 @@ process BUILD_RUN_SUMMARY {
         'biocontainers/pandas:2.2.1'}"
 
     input:
-    val trigger_files
-    val outdir
+    tuple val(rels), path(files, stageAs: 'staged_inputs/?/*')
     val pipeline_version
 
     output:
@@ -21,9 +20,19 @@ process BUILD_RUN_SUMMARY {
     task.ext.when == null || task.ext.when
 
     script:
+    def rel_words = rels.collect { rel -> "'" + rel.toString().replace("'", "'\\''") + "'" }.join(' ')
     """
+    # Rebuild <sample>/<read_type>/<file> from the staged inputs (staged_inputs/N is the Nth entry of rels)
+    mkdir -p staged_outdir
+    n=0
+    for rel in ${rel_words}; do
+        n=\$((n + 1))
+        mkdir -p "staged_outdir/\$(dirname "\$rel")"
+        ln -sf "\$PWD/staged_inputs/\$n/\$(basename "\$rel")" "staged_outdir/\$rel"
+    done
+
     python3 ${projectDir}/bin/build_run_summary.py \\
-        --outdir "${outdir}" \\
+        --outdir staged_outdir \\
         --pipeline-version "${pipeline_version}" \\
         --min-reference-coverage-pct ${params.qc_min_ref_coverage_pct} \\
         --output combined_results_summary.csv \\

@@ -104,6 +104,23 @@ Samples with no usable data are handled explicitly so that they do not fail the 
 
 Those samples still appear in the final `combined_results_summary.csv` with QC status and failure-reason fields describing what happened. Unexpected process failures still stop the pipeline.
 
+## Hybrid-capture data, duplicates, and IUPAC codes
+
+Libraries that are PCR-amplified before and after hybrid capture (e.g. Twist panels) can have a substantial duplicate fraction. Duplicate reads inflate the apparent support for low-frequency alleles, which is particularly noticeable at mixed sites supported by only a few reads. For Illumina data, pass `mark_duplicates: true` in a params file (`-params-file`) to flag duplicate read pairs with `samtools markdup`. Reads are flagged, not removed, and flagged reads are ignored by LoFreq and by the depth calculation used for consensus masking. Do not enable this for tiled amplicon data, where identical fragment coordinates are expected.
+
+The `twist` profile bundles the settings appropriate for this kind of data (`skip_primer_trimming: true` and `mark_duplicates: true`):
+
+```bash
+nextflow run charlesfoster/h2seq -profile twist,docker -params-file params.yml
+```
+
+Values in a params file take precedence over the profile, so e.g. `mark_duplicates: false` switches duplicate marking back off.
+
+Independently of duplicate marking, mixed SNV sites are only written as IUPAC ambiguity codes in the IUPAC consensus if they pass `--illumina_iupac_min_af` (default `0.2`) and `--illumina_iupac_min_alt_reads` (default `5`); the ONT equivalents default to `0.15` and `0`, which preserves the previous behaviour for ONT data. Sites below these thresholds remain in `*.final.vcf.gz` but not in `*.final_consensus.vcf.gz`.
+
+> [!NOTE]
+> Parameters of type boolean or number passed on the command line (e.g. `--mark_duplicates`) arrive as strings on Nextflow `>=26.04` and fail validation with some nf-schema versions. Prefer `-params-file`.
+
 ## Mixed Infections
 
 When reference selection retains multiple genotype references, the second mapping
