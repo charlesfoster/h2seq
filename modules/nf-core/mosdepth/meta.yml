@@ -34,11 +34,6 @@ input:
         description: BED file with intersected intervals
         pattern: "*.{bed}"
         ontologies: []
-  - - meta2:
-        type: map
-        description: |
-          Groovy Map containing bed information
-          e.g. [ id:'test' ]
     - fasta:
         type: file
         description: Reference genome FASTA file

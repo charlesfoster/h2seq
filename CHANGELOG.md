@@ -3,6 +3,16 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.6.1 - [Unreleased]
+
+### `Added`
+
+- `--save_mapped_bam` now publishes the final BAM/CSI used for coverage, variant calling and the consensus (`*.markdup.bam` for Illumina data with `--mark_duplicates`, otherwise `*.mixed_filtered.bam`) and the `*.mask.bed` of low-depth positions written as `N`, to the `consensus` directory. The parameter was previously not connected to any output
+
+### `Fixed`
+
+- `MOSDEPTH_GENOME` received its reference FASTA from a separate, unsynchronised channel, so with multiple samples a task could be staged with another sample's `draft_consensus.fa`. The FASTA is now joined to each sample's BAM by sample ID (the module is patched to take it in the main input tuple). Coverage values were unaffected because mosdepth only uses `--fasta` for CRAM input
+
 ## v0.6.0 - [2026-10-21]
 
 ### `Added`

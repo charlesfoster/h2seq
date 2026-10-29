@@ -666,18 +666,18 @@ workflow H2SEQ {
             },
             by: [0, 1]
         )
-        .map { _id, _long_reads, meta, bam, _meta2, idx, refMeta, bed ->
-            [meta + [reference_name: refMeta.reference_name], bam, idx, bed]
-        }
-
-    ch_mosdepth_reference = ch_reference_fai
-        .map { _id, _long_reads, meta, fasta, _fai ->
-            [meta, fasta]
+        .combine(
+            ch_reference_fai.map { _id, _long_reads, meta, fasta, _fai ->
+                [meta.id, meta.long_reads, meta, fasta]
+            },
+            by: [0, 1]
+        )
+        .map { _id, _long_reads, meta, bam, _meta2, idx, _meta3, bed, refMeta, fasta ->
+            [meta + [reference_name: refMeta.reference_name], bam, idx, bed, fasta]
         }
 
     MOSDEPTH_GENOME (
-        ch_mosdepth_input,
-        ch_mosdepth_reference
+        ch_mosdepth_input
     )
     ch_versions = ch_versions.mix(MOSDEPTH_GENOME.out.versions)
     ch_multiqc_files = ch_multiqc_files.mix(MOSDEPTH_GENOME.out.summary_txt.collect { it[1] })

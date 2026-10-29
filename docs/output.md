@@ -78,7 +78,9 @@ Typical contents:
 - split IUPAC consensus FASTA files such as `*.consensus_main.fa`
 - split simple majority-allele consensus FASTA files such as `*.simple.consensus_main.fa`
 - alternate consensus FASTA files when multiple candidate references are retained
-- mapped BAM/CSI files when `--save_mapped_bam` is enabled
+- when `--save_mapped_bam` is enabled:
+  - the final BAM/CSI (`*.mixed_filtered.bam`, or `*.markdup.bam` for Illumina data with `--mark_duplicates`) used for coverage, variant calling and the consensus. Its reference is the sample's draft consensus (`iterative_consensus/*.draft_consensus.fa`), so load both in IGV together
+  - `*.mask.bed`, the positions below `--consensus_min_depth` that are written as `N` in the consensus
 
 ### `variant_calling`
 
