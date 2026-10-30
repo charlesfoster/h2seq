@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `--save_mapped_bam` now publishes the final BAM/CSI used for coverage, variant calling and the consensus (`*.markdup.bam` for Illumina data with `--mark_duplicates`, otherwise `*.mixed_filtered.bam`) and the `*.mask.bed` of low-depth positions written as `N`, to the `consensus` directory. The parameter was previously not connected to any output
 
+### `Changed`
+
+- The round 1 draft consensus (`samtools consensus`) now always calls the most common base (`-c 0`) instead of writing `N` where the top base is under samtools' default 75% of the depth. Those Ns were carried into the final consensus, hiding majority bases and mixed sites. Minor alleles are now resolved in round 2 by variant calling and the existing `--consensus_call_af` and IUPAC thresholds, so mixed sites above the IUPAC thresholds appear as IUPAC codes. Remaining `N`s in the consensus come only from low depth (`--consensus_min_depth`)
+
 ### `Fixed`
 
 - `MOSDEPTH_GENOME` received its reference FASTA from a separate, unsynchronised channel, so with multiple samples a task could be staged with another sample's `draft_consensus.fa`. The FASTA is now joined to each sample's BAM by sample ID (the module is patched to take it in the main input tuple). Coverage values were unaffected because mosdepth only uses `--fasta` for CRAM input

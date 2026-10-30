@@ -22,6 +22,10 @@ process SAMTOOLS_CONSENSUS {
     def prefix = task.ext.prefix ?: "${meta.id}"
     // -T/--ref-qual 1: fill zero-coverage positions from the mapping reference instead of N,
     // so round 2 can map through divergent regions (e.g. HCV HVR1) rather than an N run.
+    // -c 0/--call-fract 0: always call the most common base. The default (0.75) writes N wherever
+    // the top base is under 75% of the depth, and that N survives into the final consensus because
+    // round 2 only applies variants onto the draft. Minor alleles are instead resolved in round 2
+    // by variant calling and the --consensus_call_af / IUPAC thresholds.
     """
     samtools consensus \\
         -m simple \\
@@ -29,6 +33,7 @@ process SAMTOOLS_CONSENSUS {
         -a \\
         -T $reference \\
         --ref-qual 1 \\
+        -c 0 \\
         $args \\
         $bam > ${prefix}.draft_consensus.fa
 
